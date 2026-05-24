@@ -66,7 +66,10 @@
           <UIcon name="heroicons:rectangle-stack" class="w-10 h-10 text-stone-400" />
         </div>
         <p class="text-lg font-medium text-stone-900 dark:text-white mb-2">暂无画集</p>
-        <p class="text-sm text-stone-600 dark:text-stone-400">点击右上角"创建画集"开始使用</p>
+        <p class="text-sm text-stone-600 dark:text-stone-400 mb-5">创建第一个画集开始管理图片</p>
+        <UButton icon="heroicons:plus" color="primary" size="md" @click="openCreateModal">
+          创建第一个画集
+        </UButton>
       </div>
 
       <div v-else class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
