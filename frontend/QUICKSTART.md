@@ -9,17 +9,17 @@ cd frontend
 npm install
 ```
 
-### 2. 配置环境变量
+### 2. 配置 API 地址（仅开发模式需要）
+
+开发时前端独立运行在 `localhost:3000`，需要指向后端：
 
 ```bash
-# 复制环境变量模板
-cp .env.example .env
-
-# 编辑 .env 文件
-# NUXT_PUBLIC_API_BASE=http://localhost:18793
+echo 'NUXT_PUBLIC_API_BASE=http://localhost:18793' > .env
 ```
 
-### 3. 启动开发服务器
+生产环境由 Flask 同端口托管，无需此配置。
+
+### 3. 启动
 
 ```bash
 # 终端 1: 启动后端
@@ -35,32 +35,33 @@ npm run dev
 
 打开浏览器访问: http://localhost:3000
 
-## 📝 默认账号
+## 📝 首次初始化
 
-管理后台登录：
-- 用户名: `admin`
-- 密码: `admin123`
-
-⚠️ **重要**: 首次登录后请立即修改密码！
+首次启动后访问任意页面会自动跳转到 `/setup` 初始化向导，按提示完成管理员账号创建和基础配置。
 
 ## 🎯 主要功能
 
-### 首页 (/)
+### 首页 `/`
 - 拖拽上传图片
 - 批量上传
 - 获取多种格式链接
 
-### 图片画廊 (/gallery)
-- 浏览所有图片
-- 搜索和筛选
+### 个人中心 `/me`
+- 创建 Token
+- TG 账号绑定
+- 会话管理
 
-### API 文档 (/docs)
+### 画集 `/album`
+- 创建和管理画集
+- 分享链接
+
+### API 文档 `/docs`
 - 查看 API 使用说明
 - 在线测试上传
 
-### 管理后台 (/admin)
+### 管理后台 `/admin`
 - 查看统计数据
-- 管理图片
+- 管理图片和画集
 - 系统配置
 
 ## 🔧 常用命令
@@ -72,23 +73,14 @@ npm run dev
 # 构建
 npm run build
 
-# 预览构建
-npm run preview
-
 # 生成静态站点
 npm run generate
 ```
 
-## 📚 下一步
-
-- 阅读 [README.md](./README.md) 了解详细信息
-- 查看 [NUXT_MIGRATION.md](../NUXT_MIGRATION.md) 了解迁移指南
-- 参考 [DEPLOYMENT.md](../DEPLOYMENT.md) 进行生产部署
-
 ## ❓ 遇到问题？
 
-1. 确保 Node.js >= 18
-2. 确保后端 API 正常运行
+1. 确保 Node.js >= 20
+2. 确保后端 API 正常运行（`python main.py`）
 3. 检查 `.env` 配置是否正确
 4. 查看浏览器控制台错误信息
 

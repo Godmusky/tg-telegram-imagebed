@@ -1,33 +1,32 @@
 # Telegram 云图床 Pro - 前端
 
-基于 Nuxt.js 3 + Vue 3 + Nuxt UI 构建的现代化图床前端应用。
+基于 Nuxt 3 + Vue 3 + Nuxt UI 构建的现代化图床前端应用。
 
 ## ✨ 特性
 
-- 🎨 **现代化 UI** - 使用 Nuxt UI 组件库，美观且易用
-- 🚀 **高性能** - 基于 Nuxt.js 3，支持 SSR/SSG
-- 📱 **响应式设计** - 完美适配桌面端和移动端
-- 🌙 **深色模式** - 内置深色主题支持
-- 🔐 **管理后台** - 完整的管理员功能
-- 📊 **数据统计** - 实时统计和监控
-- 🖼️ **图片画廊** - 优雅的图片浏览体验
-- 📚 **API 文档** - 数据驱动的交互式 API 文档
-- 🎫 **Token 系统** - 游客 Token 创建与管理
-- 🗄️ **多存储管理** - 可视化配置多种存储驱动
+- 🎨 **现代化 UI** - Nuxt UI 组件库，深色模式支持
+- 🚀 **高性能** - Nuxt 3 SPA 模式，客户端渲染
+- 📱 **响应式设计** - 桌面端和移动端完美适配
+- 🔐 **管理后台** - 完整的仪表盘、图片管理、Token 管理、存储配置
+- 🖼️ **画集系统** - 公开/私有/Token/密码四种访问模式
+- 🏠 **画集站点** - 独立的前端展示站，支持 SEO 配置
+- 📚 **API 文档** - 内置 `/docs` 交互式 API 文档页
+- 🔗 **TG 认证** - Telegram 登录绑定、身份管理、会话控制
+- 🗄️ **多存储管理** - 可视化配置 Telegram/S3/Local/rclone
 
 ## 🛠️ 技术栈
 
-- **框架**: Nuxt.js 3
-- **UI 库**: Nuxt UI (基于 Tailwind CSS)
+- **框架**: Nuxt 3
+- **UI 库**: Nuxt UI
 - **状态管理**: Pinia
-- **工具库**: VueUse
+- **包管理**: npm / pnpm
 - **语言**: TypeScript
 
 ## 📦 安装
 
 ### 前置要求
 
-- Node.js >= 18
+- Node.js >= 20
 - npm 或 pnpm
 
 ### 安装依赖
@@ -47,185 +46,190 @@ pnpm install
 npm run dev
 ```
 
-访问 http://localhost:3000
+访问 http://localhost:3000 ，确保后端已在 `18793` 端口运行。
 
-### 环境变量配置
+### API 地址配置
 
-复制 `.env.example` 为 `.env` 并配置：
+默认请求同域后端（生产模式由 Flask 同端口托管）。开发时可在 `.env` 中覆盖：
 
 ```env
-# API 配置
 NUXT_PUBLIC_API_BASE=http://localhost:18793
-NUXT_PUBLIC_CDN_DOMAIN=
-NUXT_PUBLIC_CDN_ENABLED=false
 ```
 
 ## 🏗️ 构建
 
-### 生产构建
-
 ```bash
+# 生产构建
 npm run build
-```
 
-### 预览生产构建
-
-```bash
-npm run preview
-```
-
-### 生成静态站点
-
-```bash
+# 生成静态站点（供后端托管）
 npm run generate
 ```
+
+产物在 `frontend/.output/public`，Docker 构建时自动由多阶段构建复制到 `/app/frontend/.output/public`。
 
 ## 📁 项目结构
 
 ```
 frontend/
-├── app.vue                 # 应用入口
-├── nuxt.config.ts         # Nuxt 配置
-├── app.config.ts          # 应用配置
-├── assets/                # 静态资源
-│   └── css/
-│       └── main.scss      # 全局样式
-├── components/            # 组件（自动导入）
-│   └── docs/              # API 文档组件
-│       ├── Layout.vue     # 文档布局
-│       ├── Sidebar.vue    # 侧边导航
-│       ├── EndpointCard.vue # 端点卡片
-│       ├── CodeBlock.vue  # 代码块
-│       └── ParamsTable.vue # 参数表格
-├── composables/           # 组合式函数
-│   └── useImageApi.ts    # API 服务
-├── data/                  # 数据文件
-│   └── apiDocs.ts        # API 文档数据
-├── layouts/               # 布局
-│   ├── default.vue       # 默认布局
-│   └── admin.vue         # 管理后台布局
-├── middleware/            # 中间件
-│   └── auth.ts           # 认证中间件
-├── pages/                 # 页面（自动路由）
-│   ├── index.vue         # 首页
-│   ├── gallery.vue       # 图片画廊
-│   ├── docs.vue          # API 文档
-│   ├── token.vue         # Token 管理
-│   └── admin/
-│       ├── index.vue     # 登录页
-│       ├── dashboard.vue # 管理仪表盘
-│       ├── storage.vue   # 存储设置
-│       └── tokens.vue    # Token 管理
-├── stores/                # 状态管理
-│   └── auth.ts           # 认证状态
-└── public/                # 公共文件
+├── app.vue                    # 应用入口
+├── nuxt.config.ts             # Nuxt 配置
+├── app.config.ts              # 应用主题配置
+├── assets/
+│   └── css/main.scss          # 全局样式
+├── components/
+│   ├── admin/                 # 管理后台组件
+│   │   ├── AdminShell.vue     # 后台主框架
+│   │   ├── AdminSidebar.vue   # 侧边导航
+│   │   ├── AdminTopbar.vue    # 顶栏
+│   │   ├── dashboard/         # 仪表盘组件
+│   │   ├── images/            # 图片管理（网格/列表/瀑布流）
+│   │   ├── tokens/            # Token 管理
+│   │   ├── storage/           # 存储配置
+│   │   ├── settings/          # 系统设置
+│   │   ├── seo/               # SEO 配置
+│   │   ├── announcement/      # 公告管理
+│   │   └── profile/           # 用户中心
+│   ├── album/                 # 画集组件
+│   │   ├── AlbumImageGrid.vue
+│   │   ├── AlbumGalleryList.vue
+│   │   ├── AlbumGalleryDetail.vue
+│   │   └── ...
+│   ├── gallery-share/         # 画集分享组件
+│   ├── gallery-site/          # 画集展示站组件
+│   ├── home/                  # 首页组件
+│   │   ├── HomeUploadZone.vue       # 拖拽上传区
+│   │   ├── HomeUploadResults.vue    # 上传结果
+│   │   └── HomeUploadHistory.vue    # 上传历史
+│   ├── MeConsoleShell.vue     # 个人控制台
+│   ├── MeTokenPanel.vue       # Token 面板
+│   ├── MeOverviewPanel.vue    # 概览面板
+│   ├── MeTgBindPanel.vue      # TG 绑定
+│   ├── MeTgIdentityPanel.vue  # TG 身份
+│   ├── MeSessionPanel.vue     # 会话管理
+│   ├── TgLoginModal.vue       # TG 登录弹窗
+│   ├── AuthLoginModal.vue     # 管理员登录弹窗
+│   ├── GalleryLightbox.vue    # 图片灯箱
+│   └── MasonryGrid.vue        # 瀑布流布局
+├── composables/               # 组合式函数
+│   ├── useUpload.ts           # 上传逻辑
+│   ├── useImageApi.ts         # 图片 API
+│   ├── useGalleryApi.ts       # 画集 API
+│   ├── useGallerySite.ts      # 画集站点
+│   ├── useAdminImages.ts      # 后台图片管理
+│   ├── useNotification.ts     # 通知系统
+│   └── ...
+├── layouts/
+│   ├── default.vue            # 默认布局
+│   ├── admin.vue              # 后台布局
+│   ├── admin-login.vue        # 后台登录布局
+│   ├── gallery-site.vue       # 画集站点布局
+│   └── gallery-site-admin.vue # 画集站点管理布局
+├── middleware/
+│   ├── auth.ts                # 后台认证
+│   └── gallery-site.global.ts # 画集站点全局中间件
+├── pages/
+│   ├── index.vue              # 首页（上传）
+│   ├── album.vue              # 我的画集
+│   ├── me.vue                 # 个人中心
+│   ├── setup.vue              # 初始化向导
+│   ├── guest.vue              # 游客页
+│   ├── tg-login.vue           # TG 登录页
+│   ├── docs.vue               # API 文档
+│   ├── g/
+│   │   └── [token].vue        # Token 画廊
+│   ├── galleries/
+│   │   └── [token]/
+│   │       ├── index.vue      # 画集列表
+│   │       └── [id].vue       # 画集详情
+│   ├── admin/
+│   │   ├── index.vue          # 后台首页/登录
+│   │   ├── dashboard.vue      # 仪表盘
+│   │   ├── images/index.vue   # 图片管理
+│   │   ├── galleries/         # 画集管理
+│   │   ├── tokens/            # Token 管理
+│   │   ├── storage.vue        # 存储配置
+│   │   ├── settings.vue       # 系统设置
+│   │   ├── seo.vue            # SEO 配置
+│   │   └── announcements/     # 公告管理
+│   └── gallery-site/          # 画集独立站点
+│       ├── index.vue          # 站点首页
+│       ├── galleries/         # 画集浏览
+│       └── admin/             # 站点管理后台
+├── stores/                    # Pinia 状态管理
+│   ├── auth.ts                # 认证状态
+│   ├── adminUi.ts             # 后台 UI 状态
+│   ├── tgAuth.ts              # TG 认证
+│   ├── notification.ts        # 通知
+│   └── token.ts               # Token 状态
+├── types/                     # TypeScript 类型定义
+├── utils/                     # 工具函数
+└── public/
+    └── favicon.ico
 ```
 
 ## 🎯 功能模块
 
-### 首页 (/)
-- 拖拽上传图片
-- 批量上传支持
+### 首页 `/`
+- 拖拽上传图片，批量上传
 - 实时上传进度
-- 多种链接格式（URL、Markdown、HTML、BBCode）
-- 统计信息展示
+- 多种链接格式（URL / Markdown / HTML / BBCode）
+- 上传历史记录
 
-### 图片画廊 (/gallery)
-- 图片网格展示
-- 搜索和排序
-- 图片预览
-- 快速复制链接
+### 个人中心 `/me`
+- Token 创建与管理
+- Telegram 账号绑定
+- 身份信息与权限
+- 会话管理
 
-### API 文档 (/docs)
-- 数据驱动的组件化文档
-- 多语言代码示例（cURL/JavaScript/Python/PHP）
-- 侧边栏导航与滚动定位
-- 响应式移动端适配
+### 画集 `/album` · `/galleries/:token`
+- 创建和管理个人画集
+- 公开 / 私有 / Token / 密码四种访问模式
+- 画集分享链接
+- 瀑布流图片浏览
 
-### Token 管理 (/token)
-- 创建游客上传 Token
-- 配置上传配额和有效期
-- 查看 Token 上传记录
-- Token 验证状态查询
+### 画集站点 `/gallery-site`
+- 独立的公开展示站
+- SEO 配置与元数据管理
+- 独立的管理后台
 
-### 管理后台 (/admin)
-- 管理员登录
-- 数据统计仪表盘
-- 图片管理（查看、删除）
-- 系统配置管理
-- 缓存管理
+### API 文档 `/docs`
+- 交互式 API 文档
+- 多语言代码示例
 
-### 存储设置 (/admin/storage)
-- 多存储驱动配置（Telegram/S3/本地/Rclone）
-- 存储健康状态监控
-- 默认存储切换
-- 上传场景路由配置
-- 管理员上传测试
-
-### Token 管理 (/admin/tokens)
-- Token 列表查看
-- Token 状态管理
-- Token 使用统计
-
-## 🔌 API 集成
-
-前端通过 `useImageApi` composable 与后端 API 交互：
-
-```typescript
-const { uploadImages, getStats, getImages } = useImageApi()
-
-// 上传图片
-const results = await uploadImages(files, (progress) => {
-  console.log(progress.percent)
-})
-
-// 获取统计
-const stats = await getStats()
-
-// 获取图片列表
-const { images, totalPages } = await getImages({ page: 1 })
-```
-
-## 🎨 主题定制
-
-在 `app.config.ts` 中配置主题：
-
-```typescript
-export default defineAppConfig({
-  ui: {
-    primary: 'purple',  // 主色调
-    gray: 'slate',      // 灰色调
-  }
-})
-```
+### 管理后台 `/admin`
+- **仪表盘** — 运行统计与系统概览
+- **图片管理** — 浏览、搜索、删除，支持网格/列表/瀑布流视图
+- **画集管理** — 全局画集管理
+- **Token 管理** — 创建、配置限制、查看使用统计
+- **存储配置** — 多后端配置、场景路由、健康检查
+- **系统设置** — 全局参数、TG Bot 配置
+- **SEO 配置** — 站点元数据
+- **公告管理** — 系统公告发布
 
 ## 🔐 认证流程
 
-1. 用户在 `/admin` 登录
-2. 登录成功后 token 存储在 localStorage
-3. 访问受保护路由时，`auth` 中间件验证 token
-4. 未认证用户重定向到登录页
+管理后台登录后 token 存储在 localStorage，`auth` 中间件拦截未认证访问。TG 认证通过 Telegram Login Widget 完成身份绑定。
 
 ## 📝 开发规范
 
-- 使用 TypeScript 编写代码
-- 遵循 Vue 3 Composition API 风格
-- 使用 Nuxt UI 组件库
-- 保持代码简洁和可维护性
+- TypeScript + Vue 3 Composition API
+- Nuxt UI 组件库
+- Pinia 状态管理
 
 ## 🐛 调试
 
-### 开发工具
+### Nuxt DevTools
 
-Nuxt DevTools 已启用，按 `Shift + Alt + D` 打开。
+开发模式下按 `Shift + Alt + D` 打开。
 
 ### 常见问题
 
 **Q: API 请求失败？**
-A: 检查 `.env` 中的 `NUXT_PUBLIC_API_BASE` 配置是否正确。
+A: 确认后端在 `18793` 端口运行，或检查 `.env` 中 `NUXT_PUBLIC_API_BASE`。
 
 **Q: 页面样式异常？**
-A: 确保已安装所有依赖，运行 `npm install`。
+A: 运行 `npm install` 确保依赖完整。
 
 **Q: 构建失败？**
 A: 清除缓存后重试：`rm -rf .nuxt node_modules && npm install`
@@ -233,11 +237,3 @@ A: 清除缓存后重试：`rm -rf .nuxt node_modules && npm install`
 ## 📄 许可证
 
 MIT License
-
-## 🤝 贡献
-
-欢迎提交 Issue 和 Pull Request！
-
-## 📮 联系方式
-
-如有问题，请提交 Issue。

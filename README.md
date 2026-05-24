@@ -10,7 +10,7 @@
 > - 业务配置默认走管理后台和数据库，不是传统 `.env` 驱动模式。
 > - 当前上传入口只接受图片文件，不是任意文件床。
 > - Telegram 存储默认可用，但超过约 `20 MB` 的大文件想走稳，建议补齐 `API ID + API Hash` 让后端自动切到 Kurigram / MTProto。
-> - 如果你前面挂了 Nginx、宝塔、Ingress、CDN 回源之类的反向代理，出现 `413 Request Entity Too Large`，大概率不是项目炸了，是你的网关体积限制没放开。相关社区反馈见 [Issue #19](https://github.com/xiyan520/tg-telegram-imagebed/issues/19)。
+> - 如果你前面挂了 Nginx、宝塔、Ingress、CDN 回源之类的反向代理，出现 `413 Request Entity Too Large`，大概率不是项目炸了，是你的网关体积限制没放开。
 
 ## 功能概览
 
@@ -43,7 +43,7 @@
 ### 方式一：直接用仓库自带 Docker Compose
 
 ```bash
-git clone https://github.com/xiyan520/tg-telegram-imagebed.git
+git clone https://github.com/Godmusky/tg-telegram-imagebed.git
 cd tg-telegram-imagebed
 docker compose up -d --build
 ```
@@ -211,9 +211,8 @@ jpg, jpeg, png, gif, webp, bmp, avif, tiff, tif, ico
 
 - 仓库：<https://github.com/lhl77/Typecho-Plugin-PicUp>
 - 文档：<https://blog.lhl.one/artical/1026.html>
-- 相关讨论：<https://github.com/xiyan520/tg-telegram-imagebed/issues/20>
 
-根据 issue 和作者文档，`PicUp` 已支持 `tgimagebed` 驱动，覆盖匿名上传和 Token 上传场景。
+根据作者文档，`PicUp` 已支持 `tgimagebed` 驱动，覆盖匿名上传和 Token 上传场景。
 
 ### 2. GioPic / fileup.dev
 
@@ -278,8 +277,7 @@ client_max_body_size 100M;
 │  ├─ services/
 │  └─ storage/
 ├─ frontend/
-├─ data/
-└─ tests/
+└─ data/
 ```
 
 ### 常用命令
