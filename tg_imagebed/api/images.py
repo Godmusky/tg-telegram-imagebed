@@ -210,13 +210,38 @@ def get_recent():
 @images_bp.route('/api/stats')
 def get_stats_api():
     """获取站点统计"""
+    from ..utils import format_size
+    import time
+    from ..config import START_TIME
+
     stats = get_stats()
     max_file_size_mb = get_system_setting_int('max_file_size_mb', 20, minimum=1, maximum=100)
+    
+    # 今日上传数
+    today_uploads = 0
+    try:
+        from ..database.connection import get_connection
+        from datetime import datetime
+        with get_connection() as conn:
+            cursor = conn.cursor()
+            today_start = int(datetime.now().replace(hour=0, minute=0, second=0, microsecond=0).timestamp())
+            today_end = int(datetime.now().replace(hour=23, minute=59, second=59, microsecond=999999).timestamp())
+            cursor.execute(
+                "SELECT COUNT(*) FROM file_storage WHERE upload_time >= ? AND upload_time <= ?",
+                (today_start, today_end)
+            )
+            today_uploads = cursor.fetchone()[0]
+    except Exception:
+        pass
 
     response = jsonify({
-        'total_files': stats['total_files'],
-        'group_uploads': stats['group_uploads'],
-        'max_file_size': max_file_size_mb * 1024 * 1024,
+        'success': True,
+        'data': {
+            'totalFiles': str(stats.get('total_files', 0)),
+            'totalSize': format_size(stats.get('total_size', 0)),
+            'todayUploads': str(today_uploads),
+            'uptime': str(int(time.time() - START_TIME)),
+        }
     })
     response.headers['Access-Control-Allow-Origin'] = '*'
     return add_cache_headers(response, 'public', 300)
