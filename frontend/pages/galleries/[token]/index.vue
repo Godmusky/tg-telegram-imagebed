@@ -122,6 +122,16 @@ const { displayName } = useSeoSettings()
 
 const shareToken = computed(() => route.params.token as string)
 
+// SEO meta
+useSeoMeta(() => ({
+  title: `全部画集 - ${displayName.value}`,
+  description: `浏览分享画集中的全部内容 - ${displayName.value}`,
+  ogTitle: `全部画集 - ${displayName.value}`,
+  ogDescription: `浏览分享画集中的全部内容 - ${displayName.value}`,
+  ogType: 'website',
+  robots: 'noindex,nofollow',
+}))
+
 const loading = ref(true)
 const error = ref('')
 const galleries = ref<any[]>([])

@@ -1,5 +1,5 @@
 import { defineStore } from 'pinia'
-import type { ApiResponse, AdminLoginData, AdminCheckResponse, AdminUpdateCredentialsData } from '~/types/api'
+import type { ApiResponse, AdminLoginData, AdminCheckResponse, AdminUpdateCredentialsData, ApiFetchError } from '~/types/api'
 
 export const useAuthStore = defineStore('auth', {
   state: () => ({
@@ -35,29 +35,30 @@ export const useAuthStore = defineStore('auth', {
 
           // 仅存储会话标记，不持久化实际 token（防止 XSS 窃取）
           if (import.meta.client) {
-            localStorage.setItem('has_session', 'true')
-            localStorage.setItem('auth_username', this.username)
+            sessionStorage.setItem('has_session', 'true')
+            sessionStorage.setItem('auth_username', this.username)
           }
 
           return response.data
         } else {
           throw new Error(response.message || '登录失败')
         }
-      } catch (error: any) {
+      } catch (error: unknown) {
         // 解析后端返回的结构化错误
-        const data = error?.data || error?.response?._data
+        const fetchErr = error as ApiFetchError
+        const data = fetchErr?.data || fetchErr?.response?._data
         if (data?.locked) {
-          const err: any = new Error(data.message || '登录尝试过多')
+          const err = new Error(data.message || '登录尝试过多') as Error & { locked: boolean; retryAfter?: number }
           err.locked = true
           err.retryAfter = data.retry_after
           throw err
         }
         if (data?.remaining_attempts !== undefined) {
-          const err: any = new Error(data.message || '登录失败')
+          const err = new Error(data.message || '登录失败') as Error & { remainingAttempts: number }
           err.remainingAttempts = data.remaining_attempts
           throw err
         }
-        throw new Error(error.message || error?.data?.message || '登录失败')
+        throw new Error(fetchErr.message || fetchErr?.data?.message || '登录失败')
       }
     },
 
@@ -79,8 +80,8 @@ export const useAuthStore = defineStore('auth', {
       this.isAuthenticated = false
 
       if (import.meta.client) {
-        localStorage.removeItem('has_session')
-        localStorage.removeItem('auth_username')
+        sessionStorage.removeItem('has_session')
+        sessionStorage.removeItem('auth_username')
       }
     },
 
@@ -98,13 +99,14 @@ export const useAuthStore = defineStore('auth', {
         if (response.success && settings.username) {
           this.username = settings.username
           if (import.meta.client) {
-            localStorage.setItem('auth_username', settings.username)
+            sessionStorage.setItem('auth_username', settings.username)
           }
         }
 
         return response
-      } catch (error: any) {
-        throw new Error(error.message || '更新设置失败')
+      } catch (error: unknown) {
+        const fetchErr = error as ApiFetchError
+        throw new Error(fetchErr.message || '更新设置失败')
       }
     },
 
@@ -112,8 +114,8 @@ export const useAuthStore = defineStore('auth', {
     async restoreAuth() {
       if (!import.meta.client) return
 
-      const hasSession = localStorage.getItem('has_session')
-      const username = localStorage.getItem('auth_username')
+      const hasSession = sessionStorage.getItem('has_session')
+      const username = sessionStorage.getItem('auth_username')
 
       if (!hasSession) {
         this.clearAuth()
@@ -165,8 +167,8 @@ export const useAuthStore = defineStore('auth', {
       this.isAuthenticated = false
 
       if (import.meta.client) {
-        localStorage.removeItem('has_session')
-        localStorage.removeItem('auth_username')
+        sessionStorage.removeItem('has_session')
+        sessionStorage.removeItem('auth_username')
       }
     },
 

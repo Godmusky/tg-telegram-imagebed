@@ -28,15 +28,12 @@ export default defineNuxtPlugin(async () => {
     return ''
   }
 
-  // 延迟调用 csrf-token 端点，确保服务端已就绪
-  // 非关键路径 —— 失败时静默忽略（cookie 可能已在之前的请求中设置）
-  setTimeout(async () => {
-    try {
-      await $fetch(`${config.public.apiBase}/api/admin/csrf-token`, {
-        credentials: 'include',
-      })
-    } catch { /* 静默 */ }
-  }, 100)
+  // 获取 CSRF token（非关键路径 —— 失败时静默忽略）
+  try {
+    await $fetch(`${config.public.apiBase}/api/admin/csrf-token`, {
+      credentials: 'include',
+    })
+  } catch { /* 静默 */ }
 
   // ---- 包装 globalThis.$fetch ----
   const orig = globalThis.$fetch as typeof $fetch

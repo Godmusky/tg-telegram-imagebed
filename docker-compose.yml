@@ -20,12 +20,24 @@ services:
     volumes:
       - ./data:/app/data
     restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    deploy:
+      resources:
+        limits:
+          cpus: '2'
+          memory: 1G
+    logging:
+      driver: json-file
+      options:
+        max-size: 10m
+        max-file: "3"
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:18793/api/health"]
       interval: 30s
       timeout: 10s
       retries: 3
-      start_period: 40s
+      start_period: 15s
 
 # 项目名称（避免中文路径问题）
 name: telegram-imagebed

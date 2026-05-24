@@ -232,6 +232,36 @@ const lightboxRef = ref<HTMLElement | null>(null)
 const currentLightboxImage = computed(() => images.value[lightboxIndex.value] || null)
 const heroCover = computed(() => gallery.value?.cover_url || images.value[0]?.url || '')
 
+// SEO meta
+const seoTitle = computed(() => {
+  const name = gallery.value?.name?.trim()
+  return name ? `${name} - 画集详情` : '画集详情'
+})
+const seoDescription = computed(() => {
+  const desc = gallery.value?.description?.trim()
+  if (desc) return desc
+  const count = gallery.value?.image_count || 0
+  return count > 0 ? `包含 ${count} 张图片的画集` : '画集详情'
+})
+const canonicalUrl = computed(() => {
+  if (import.meta.client) return window.location.href
+  return ''
+})
+
+useSeoMeta(() => ({
+  title: seoTitle.value,
+  description: seoDescription.value,
+  ogTitle: seoTitle.value,
+  ogDescription: seoDescription.value,
+  ogImage: heroCover.value || undefined,
+  ogUrl: canonicalUrl.value || undefined,
+  ogType: 'website',
+  twitterCard: heroCover.value ? 'summary_large_image' : 'summary',
+  twitterTitle: seoTitle.value,
+  twitterDescription: seoDescription.value,
+  twitterImage: heroCover.value || undefined,
+}))
+
 const formatDate = (value?: string) => {
   if (!value) return '--'
   const date = new Date(value)

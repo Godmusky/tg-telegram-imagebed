@@ -28,6 +28,16 @@ export interface TokenUploadResult extends UploadResult {
   remaining_uploads: number
 }
 
+/** 上传失败结果 */
+export interface FailedUploadResult {
+  success: false
+  filename: string
+  error: string
+}
+
+/** 统一上传结果（成功或失败） */
+export type UploadFileResult = UploadResult | TokenUploadResult | FailedUploadResult
+
 // ===================== 图片相关 =====================
 
 /** 公共统计信息（GET /api/stats） */
@@ -227,10 +237,32 @@ export interface AdminLoginErrorResponse {
   remaining_attempts?: number
 }
 
-/** 管理员凭据更新响应 */
+// ===================== 管理员凭据更新响应 =====================
 export interface AdminUpdateCredentialsData {
   success: boolean
   message: string
   updated_username: boolean
   updated_password: boolean
+}
+
+/**
+ * Nuxt $fetch 错误形状（ofetch FetchError 的简化版本）
+ * 用于替代 catch 块中的 any 类型
+ */
+export interface ApiFetchError extends Error {
+  data?: {
+    message?: string
+    locked?: boolean
+    retry_after?: number
+    remaining_attempts?: number
+  }
+  response?: {
+    _data?: {
+      message?: string
+      locked?: boolean
+      retry_after?: number
+      remaining_attempts?: number
+    }
+  }
+  statusCode?: number
 }

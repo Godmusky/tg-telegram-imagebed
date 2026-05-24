@@ -29,6 +29,10 @@ ENV/
 # 数据目录
 data/
 
+# Markdown 文档（保留根目录 README.md）
+*.md
+!/README.md
+
 # Git
 .git/
 .gitignore

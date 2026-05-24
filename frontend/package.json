@@ -8,7 +8,9 @@
     "build": "nuxt build",
     "generate": "nuxt generate",
     "preview": "nuxt preview",
-    "postinstall": "nuxt prepare"
+    "postinstall": "nuxt prepare",
+    "audit": "nuxt build",
+    "typecheck": "nuxt typecheck"
   },
   "dependencies": {
     "@iconify-json/heroicons": "^1.2.3",
@@ -17,6 +19,7 @@
     "@iconify-json/lucide": "^1.1.192",
     "@nuxt/ui": "2.18.4",
     "@pinia/nuxt": "^0.5.1",
+    "@vueuse/core": "^11.0.3",
     "dompurify": "^3.4.5",
     "nuxt": "^3.13.2",
     "pinia": "^2.2.2",
@@ -26,7 +29,6 @@
     "@nuxt/devtools": "^1.4.2",
     "@nuxtjs/tailwindcss": "^6.12.1",
     "@types/dompurify": "^3.0.5",
-    "@vueuse/core": "^11.0.3",
     "@vueuse/nuxt": "^11.0.3",
     "baseline-browser-mapping": "^2.10.0",
     "sass": "^1.77.8",

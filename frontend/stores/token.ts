@@ -8,38 +8,41 @@ const LEGACY_IS_GUEST_KEY = 'is_guest'
 
 const nowIso = () => new Date().toISOString()
 
-// ── Token 混淆编解码（base64 + 字符位移，防止明文存储）──────────────────────
-const SHIFT = 3
+// ── Token AES-GCM 加密存储 ──────────────────────────────────────────────
+const ENC_KEY_STORAGE = 'token_enc_key'
+const ENC_PREFIX = 'ae:'
+const LEGACY_PREFIX = 'ob:'
 
-/**
- * 编码：base64 后对每个字符做位移混淆
- * 存储格式：'ob:' 前缀 + 混淆字符串
- */
-const obfuscateToken = (token: string): string => {
-  if (!token) return token
-  try {
-    const b64 = btoa(unescape(encodeURIComponent(token)))
-    const shifted = b64.split('').map(c => {
-      const code = c.charCodeAt(0)
-      // 仅对 ASCII 可打印字符做位移
-      if (code >= 33 && code <= 126) {
-        return String.fromCharCode(((code - 33 + SHIFT) % 94) + 33)
+let _encKey: CryptoKey | null = null
+let _encKeyPromise: Promise<CryptoKey> | null = null
+
+/** 获取或创建 AES-GCM 加密密钥（存 sessionStorage，会话级别） */
+const getEncKey = async (): Promise<CryptoKey> => {
+  if (_encKey) return _encKey
+  if (_encKeyPromise) return _encKeyPromise
+  _encKeyPromise = (async () => {
+    const stored = sessionStorage.getItem(ENC_KEY_STORAGE)
+    if (stored) {
+      try {
+        const rawKey = Uint8Array.from(atob(stored), c => c.charCodeAt(0))
+        _encKey = await crypto.subtle.importKey('raw', rawKey, { name: 'AES-GCM', length: 256 }, false, ['encrypt', 'decrypt'])
+        return _encKey
+      } catch {
+        sessionStorage.removeItem(ENC_KEY_STORAGE)
       }
-      return c
-    }).join('')
-    return `ob:${shifted}`
-  } catch {
-    return token
-  }
+    }
+    _encKey = await crypto.subtle.generateKey({ name: 'AES-GCM', length: 256 }, true, ['encrypt', 'decrypt'])
+    const rawKey = new Uint8Array(await crypto.subtle.exportKey('raw', _encKey))
+    sessionStorage.setItem(ENC_KEY_STORAGE, btoa(String.fromCharCode(...rawKey)))
+    return _encKey
+  })()
+  return _encKeyPromise
 }
 
-/**
- * 解码：检测前缀，有则还原，无则视为旧格式直接返回（自动迁移）
- */
-const deobfuscateToken = (stored: string): string => {
-  if (!stored) return stored
-  // 旧格式（无前缀）直接返回
-  if (!stored.startsWith('ob:')) return stored
+/** 旧格式解码（base64 + 字符位移 SHIFT=3），仅用于迁移 */
+const deobfuscateLegacy = (stored: string): string => {
+  if (!stored || !stored.startsWith(LEGACY_PREFIX)) return stored
+  const SHIFT = 3
   try {
     const shifted = stored.slice(3)
     const b64 = shifted.split('').map(c => {
@@ -53,6 +56,60 @@ const deobfuscateToken = (stored: string): string => {
   } catch {
     return stored
   }
+}
+
+/**
+ * 加密：AES-GCM 加密 token，格式 'ae:<base64-iv>:<base64-ciphertext>'
+ * 已是 ae: 前缀则跳过，ob: 前缀先解码再加密（自动迁移）
+ */
+const encryptToken = async (token: string): Promise<string> => {
+  if (!token) return token
+  if (token.startsWith(ENC_PREFIX)) return token
+  let plaintext = token
+  if (token.startsWith(LEGACY_PREFIX)) {
+    plaintext = deobfuscateLegacy(token)
+  }
+  try {
+    const key = await getEncKey()
+    const iv = crypto.getRandomValues(new Uint8Array(12))
+    const encoded = new TextEncoder().encode(plaintext)
+    const ciphertext = await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, key, encoded)
+    const ctArray = new Uint8Array(ciphertext)
+    return `${ENC_PREFIX}${btoa(String.fromCharCode(...iv))}:${btoa(String.fromCharCode(...ctArray))}`
+  } catch {
+    return token
+  }
+}
+
+/**
+ * 解密：AES-GCM 解密，兼容旧格式 ob: 前缀和明文（自动迁移）
+ * 新会话无密钥时，ae: 加密项解密失败 → 返回空串（该项视为无效）
+ */
+const decryptToken = async (stored: string): Promise<string> => {
+  if (!stored) return stored
+  // AES-GCM 加密格式
+  if (stored.startsWith(ENC_PREFIX)) {
+    try {
+      const key = await getEncKey()
+      const payload = stored.slice(3)
+      const sepIdx = payload.indexOf(':')
+      if (sepIdx < 0) return ''
+      const ivB64 = payload.slice(0, sepIdx)
+      const ctB64 = payload.slice(sepIdx + 1)
+      const iv = Uint8Array.from(atob(ivB64), c => c.charCodeAt(0))
+      const ct = Uint8Array.from(atob(ctB64), c => c.charCodeAt(0))
+      const decrypted = await crypto.subtle.decrypt({ name: 'AES-GCM', iv }, key, ct)
+      return new TextDecoder().decode(decrypted)
+    } catch {
+      return '' // 新会话无密钥，解密失败视为无效
+    }
+  }
+  // 旧格式迁移：ob: 前缀 → 解码为明文
+  if (stored.startsWith(LEGACY_PREFIX)) {
+    return deobfuscateLegacy(stored)
+  }
+  // 明文直接返回
+  return stored
 }
 
 export const maskToken = (token: string) => {
@@ -120,36 +177,43 @@ export const useTokenStore = defineStore('token', {
   },
 
   actions: {
-    persistVault() {
+    async persistVault() {
       if (!import.meta.client) return
-      // 存储前对每个 token 做混淆处理
+      // 存储前对每个 token 做 AES-GCM 加密
+      const encryptedItems = await Promise.all(
+        this.vault.items.map(async i => ({
+          ...i,
+          token: await encryptToken(i.token)
+        }))
+      )
       const vaultToStore = {
         ...this.vault,
-        items: this.vault.items.map(i => ({
-          ...i,
-          token: obfuscateToken(i.token)
-        }))
+        items: encryptedItems
       }
       localStorage.setItem(VAULT_STORAGE_KEY, JSON.stringify(vaultToStore))
     },
 
-    loadVault() {
+    async loadVault() {
       if (!import.meta.client) return
       const raw = localStorage.getItem(VAULT_STORAGE_KEY)
       const parsed = safeParse<TokenVaultPersistedV1 | null>(raw, null)
       if (parsed?.version === 1 && Array.isArray(parsed.items)) {
-        const validItems = parsed.items
-          .filter(i => i && typeof i.id === 'string' && typeof i.token === 'string')
-          .map(i => ({
-            id: i.id,
-            // 读取时解码（兼容旧格式明文 token）
-            token: deobfuscateToken((i.token || '').trim()),
-            albumName: typeof i.albumName === 'string' ? i.albumName : '',
-            addedAt: i.addedAt || nowIso(),
-            lastSelectedAt: i.lastSelectedAt,
-            lastVerifiedAt: i.lastVerifiedAt,
-            tokenInfo: i.tokenInfo
-          }))
+        const decryptedItems = await Promise.all(
+          parsed.items
+            .filter(i => i && typeof i.id === 'string' && typeof i.token === 'string')
+            .map(async i => ({
+              id: i.id,
+              // 读取时解密（兼容 ob: 旧格式和明文，ae: 加密项新会话无密钥时返回空串）
+              token: await decryptToken((i.token || '').trim()),
+              albumName: typeof i.albumName === 'string' ? i.albumName : '',
+              addedAt: i.addedAt || nowIso(),
+              lastSelectedAt: i.lastSelectedAt,
+              lastVerifiedAt: i.lastVerifiedAt,
+              tokenInfo: i.tokenInfo
+            }))
+        )
+        // 过滤掉解密失败的项（新会话无密钥时 ae: 加密项会返回空串）
+        const validItems = decryptedItems.filter(i => i.token)
 
         // 验证 activeId 是否有效，无效则自动选择第一个
         let activeId = parsed.activeId || null
@@ -165,7 +229,7 @@ export const useTokenStore = defineStore('token', {
       }
     },
 
-    importLegacySingleTokenIfNeeded() {
+    async importLegacySingleTokenIfNeeded() {
       if (!import.meta.client) return
       const legacyToken = (localStorage.getItem(LEGACY_TOKEN_KEY) || '').trim()
       const legacyIsGuest = localStorage.getItem(LEGACY_IS_GUEST_KEY) === 'true'
@@ -181,7 +245,7 @@ export const useTokenStore = defineStore('token', {
         }
         this.vault.items.unshift(item)
         this.vault.activeId = item.id
-        this.persistVault()
+        await this.persistVault()
       }
 
       localStorage.removeItem(LEGACY_TOKEN_KEY)

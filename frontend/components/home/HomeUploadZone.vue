@@ -102,7 +102,7 @@
 
 <script setup lang="ts">
 import type { CSSProperties } from 'vue'
-import type { UploadResult } from '~/types/upload'
+import type { UploadResult, UploadFileResult, FailedUploadResult } from '~/types/upload'
 
 type UploadPhase = 'idle' | 'dragging' | 'uploading' | 'success' | 'error'
 
@@ -340,27 +340,41 @@ const handleFiles = async (files: File[]) => {
   nextMilestoneIndex.value = 0
   uploadProgress.value = { label: `准备上传 ${validFiles.length} 张图片...`, percent: 0 }
 
-  try {
-    const results = await uploadFiles(validFiles, (p) => {
-      uploadProgress.value = p
-    })
-    uploadProgress.value = { label: '上传完成', percent: 100 }
-    lastUploadCount.value = results.length
-    toast.success('上传成功', `成功上传 ${results.length} 张图片`)
+  const results: UploadFileResult[] = await uploadFiles(validFiles, (p) => {
+    uploadProgress.value = p
+  })
+  uploadProgress.value = { label: '上传完成', percent: 100 }
+
+  // 分离成功和失败结果
+  const successes = results.filter((r): r is UploadResult => 'url' in r)
+  const failures = results.filter((r): r is FailedUploadResult => 'success' in r && !r.success)
+
+  // 检查是否是用户取消（任一文件被取消即视为整批取消）
+  const wasCancelled = failures.some(f => f.error === '上传已取消')
+  if (wasCancelled) {
+    resetToIdle()
+    return
+  }
+
+  uploading.value = false
+
+  if (successes.length > 0) {
+    lastUploadCount.value = successes.length
     triggerStatsRefresh()
-    emit('uploaded', results)
-    uploading.value = false
+    emit('uploaded', successes)
+    if (failures.length > 0) {
+      const failedNames = failures.map(f => f.filename).join(', ')
+      toast.warning('部分上传失败', `${successes.length} 张成功，${failures.length} 张失败：${failedNames}`)
+    } else {
+      toast.success('上传成功', `成功上传 ${successes.length} 张图片`)
+    }
     uploadPhase.value = 'success'
     scheduleIdle(720)
-  } catch (error: any) {
-    const message = error?.data?.error || error?.message || '未知错误'
-    uploading.value = false
-    if (message === '上传已取消') {
-      resetToIdle()
-      return
-    }
-    lastErrorMessage.value = message
-    toast.error('上传失败', message)
+  } else {
+    // 全部失败
+    const errorMessages = [...new Set(failures.map(f => f.error))]
+    lastErrorMessage.value = errorMessages.join('；')
+    toast.error('上传失败', errorMessages.join('；'))
     uploadPhase.value = 'error'
     scheduleIdle(1000)
   }

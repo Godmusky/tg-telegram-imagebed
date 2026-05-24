@@ -1,6 +1,8 @@
 import type {
   AdminImageItem,
-  AdminImagesQuery,
+} from '~/types/api'
+import { useAdminImagesData, createDefaultAdvancedFilters } from '~/composables/useAdminImagesData'
+import type {
   AdminImageSortBy,
   AdminImageSortOrder,
 } from '~/types/api'
@@ -8,77 +10,29 @@ import type {
 export type AdminImagesViewMode = 'list' | 'grid' | 'masonry'
 export type AdminLegacyFilter = 'all' | 'cached' | 'uncached' | 'group'
 
-export interface AdminImagesAdvancedFilters {
-  source: string
-  cacheStatus: 'all' | 'cached' | 'uncached'
-  dateFrom: string
-  dateTo: string
-  sizeMinMb: string
-  sizeMaxMb: string
-  accessMin: string
-  accessMax: string
-}
+// Re-export types that consumers import from this module
+export type { AdminImagesAdvancedFilters } from '~/composables/useAdminImagesData'
 
 const VIEW_MODE_STORAGE_KEY = 'admin_images_view_mode'
 
-const createDefaultAdvancedFilters = (): AdminImagesAdvancedFilters => ({
-  source: 'all',
-  cacheStatus: 'all',
-  dateFrom: '',
-  dateTo: '',
-  sizeMinMb: '',
-  sizeMaxMb: '',
-  accessMin: '',
-  accessMax: '',
-})
-
-const parsePositiveNumber = (value: string): number | undefined => {
-  const trimmed = String(value || '').trim()
-  if (!trimmed) return undefined
-  const parsed = Number(trimmed)
-  if (!Number.isFinite(parsed) || parsed < 0) return undefined
-  return parsed
-}
-
-const asBytesFromMb = (valueMb: string): number | undefined => {
-  const parsed = parsePositiveNumber(valueMb)
-  if (parsed === undefined) return undefined
-  return Math.round(parsed * 1024 * 1024)
-}
-
 export const useAdminImages = () => {
   const notification = useNotification()
-  const runtimeConfig = useRuntimeConfig()
-  const { getImages, deleteImages, clearCache } = useImageApi()
 
-  const loading = ref(false)
-  const refreshing = ref(false)
+  // ── 组合数据层 ──
+  const data = useAdminImagesData()
+
+  // ── UI 状态 ──
   const deleting = ref(false)
-
-  const images = ref<AdminImageItem[]>([])
   const selectedIds = ref<string[]>([])
-
-  const searchQuery = ref('')
-  const primaryFilter = ref<AdminLegacyFilter>('all')
-  const sortBy = ref<AdminImageSortBy>('created_at')
-  const sortOrder = ref<AdminImageSortOrder>('desc')
-  const advancedFilters = ref<AdminImagesAdvancedFilters>(createDefaultAdvancedFilters())
-
-  const currentPage = ref(1)
-  const totalPages = ref(1)
-  const totalCount = ref(0)
-  const pageSize = ref(50)
 
   const detailModalOpen = ref(false)
   const detailIndex = ref(-1)
   const selectedImage = ref<AdminImageItem | null>(null)
   const deleteModalOpen = ref(false)
   const deleteMessage = ref('')
+  const deleteWithStorage = ref(true)
 
   const advancedPanelOpen = ref(false)
-
-  const tgSyncDeleteEnabled = ref(false)
-  const deleteWithStorage = ref(true)
 
   const viewMode = ref<AdminImagesViewMode>('list')
 
@@ -95,103 +49,19 @@ export const useAdminImages = () => {
     }
   })
 
+  // ── 选择相关 ──
   const selectedCount = computed(() => selectedIds.value.length)
+
   const isAllOnPageSelected = computed(() => {
-    if (!images.value.length) return false
-    return images.value.every(item => selectedIds.value.includes(item.id))
+    if (!data.images.value.length) return false
+    return data.images.value.every(item => selectedIds.value.includes(item.id))
   })
+
   const isPagePartiallySelected = computed(() => {
-    if (!images.value.length) return false
-    const selectedOnPage = images.value.filter(item => selectedIds.value.includes(item.id)).length
-    return selectedOnPage > 0 && selectedOnPage < images.value.length
+    if (!data.images.value.length) return false
+    const selectedOnPage = data.images.value.filter(item => selectedIds.value.includes(item.id)).length
+    return selectedOnPage > 0 && selectedOnPage < data.images.value.length
   })
-
-  const hasActiveAdvancedFilters = computed(() => {
-    const af = advancedFilters.value
-    return af.source !== 'all'
-      || af.cacheStatus !== 'all'
-      || !!af.dateFrom
-      || !!af.dateTo
-      || !!String(af.sizeMinMb || '').trim()
-      || !!String(af.sizeMaxMb || '').trim()
-      || !!String(af.accessMin || '').trim()
-      || !!String(af.accessMax || '').trim()
-  })
-
-  const hasPrevDetail = computed(() => detailIndex.value > 0)
-  const hasNextDetail = computed(() => detailIndex.value >= 0 && detailIndex.value < images.value.length - 1)
-
-  const pageSizeOptions = [
-    { label: '20 / 页', value: 20 },
-    { label: '50 / 页', value: 50 },
-    { label: '100 / 页', value: 100 },
-    { label: '200 / 页', value: 200 },
-  ]
-
-  const primaryFilterOptions = [
-    { label: '全部图片', value: 'all' },
-    { label: '已缓存', value: 'cached' },
-    { label: '未缓存', value: 'uncached' },
-    { label: '群组上传', value: 'group' },
-  ]
-
-  const sortByOptions = [
-    { label: '按上传时间', value: 'created_at' },
-    { label: '按文件大小', value: 'file_size' },
-    { label: '按总访问量', value: 'access_count' },
-    { label: '按 CDN 访问量', value: 'cdn_hit_count' },
-    { label: '按直连访问量', value: 'direct_hit_count' },
-  ]
-
-  const sortOrderOptions = [
-    { label: '降序', value: 'desc' },
-    { label: '升序', value: 'asc' },
-  ]
-
-  const sourceOptions = [
-    { label: '全部来源', value: 'all' },
-    { label: 'Token 上传', value: 'token' },
-    { label: '群组上传', value: 'group' },
-    { label: '机器人上传', value: 'telegram_bot' },
-    { label: '管理员上传', value: 'admin_upload' },
-    { label: '匿名上传', value: 'guest' },
-  ]
-
-  const buildQueryParams = (): AdminImagesQuery => {
-    const query: AdminImagesQuery = {
-      page: currentPage.value,
-      limit: Number(pageSize.value),
-      search: searchQuery.value.trim(),
-      filter: primaryFilter.value,
-      sort_by: sortBy.value,
-      sort_order: sortOrder.value,
-    }
-
-    const af = advancedFilters.value
-
-    if (af.source !== 'all') {
-      query.source = af.source
-    }
-
-    if (af.cacheStatus === 'cached' || af.cacheStatus === 'uncached') {
-      query.filter = af.cacheStatus
-    }
-
-    if (af.dateFrom) query.date_from = af.dateFrom
-    if (af.dateTo) query.date_to = af.dateTo
-
-    const sizeMin = asBytesFromMb(af.sizeMinMb)
-    const sizeMax = asBytesFromMb(af.sizeMaxMb)
-    const accessMin = parsePositiveNumber(af.accessMin)
-    const accessMax = parsePositiveNumber(af.accessMax)
-
-    if (sizeMin !== undefined) query.size_min = sizeMin
-    if (sizeMax !== undefined) query.size_max = sizeMax
-    if (accessMin !== undefined) query.access_min = Math.floor(accessMin)
-    if (accessMax !== undefined) query.access_max = Math.floor(accessMax)
-
-    return query
-  }
 
   const clearSelection = () => {
     selectedIds.value = []
@@ -208,41 +78,24 @@ export const useAdminImages = () => {
 
   const toggleSelectAllOnPage = () => {
     if (isAllOnPageSelected.value) {
-      const currentIds = new Set(images.value.map(item => item.id))
+      const currentIds = new Set(data.images.value.map(item => item.id))
       selectedIds.value = selectedIds.value.filter(id => !currentIds.has(id))
       return
     }
 
     const merged = new Set(selectedIds.value)
-    for (const item of images.value) {
+    for (const item of data.images.value) {
       merged.add(item.id)
     }
     selectedIds.value = [...merged]
   }
 
-  const loadSyncDeleteSetting = async () => {
-    try {
-      const resp = await $fetch<any>(`${runtimeConfig.public.apiBase}/api/admin/system/settings`, {
-        credentials: 'include',
-      })
-      if (resp?.success) {
-        tgSyncDeleteEnabled.value = resp.data?.tg_sync_delete_enabled === true
-          || String(resp.data?.tg_sync_delete_enabled) === '1'
-      }
-    } catch {
-      // 静默失败
-    }
-  }
-
+  // ── 数据获取（组合 UI 层处理：选择清除 + 通知） ──
   const fetchImages = async (opts: { silent?: boolean; keepSelection?: boolean } = {}) => {
     const silent = opts.silent ?? false
     const keepSelection = opts.keepSelection ?? false
-    loading.value = true
     try {
-      const data = await getImages(buildQueryParams())
-      images.value = data.images || []
-      totalPages.value = data.totalPages || 1
-      totalCount.value = data.total ?? images.value.length
+      await data.fetchData({ silent })
       if (!keepSelection) {
         clearSelection()
       }
@@ -250,85 +103,79 @@ export const useAdminImages = () => {
       if (!silent) {
         notification.error('错误', '加载图片列表失败')
       }
-      console.error('加载图片列表失败:', error)
-    } finally {
-      loading.value = false
     }
   }
 
   const refresh = async () => {
-    refreshing.value = true
+    data.refreshing.value = true
     await fetchImages({ silent: true, keepSelection: true })
-    refreshing.value = false
+    data.refreshing.value = false
     notification.success('已刷新', '图片数据已更新')
   }
 
+  // ── 查询动作（调用 fetchImages 以正确处理选择清除） ──
   const applySearchDebounced = useDebounceFn(() => {
-    currentPage.value = 1
+    data.currentPage.value = 1
     fetchImages()
   }, 400)
 
   const setSearchQuery = (value: string) => {
-    searchQuery.value = value
+    data.searchQuery.value = value
     applySearchDebounced()
   }
 
+  const changePage = (page: number) => {
+    data.currentPage.value = Math.max(1, Number(page || 1))
+    fetchImages()
+  }
+
   const applyPrimaryFilter = (value: AdminLegacyFilter) => {
-    primaryFilter.value = value
-    currentPage.value = 1
+    data.primaryFilter.value = value
+    data.currentPage.value = 1
     fetchImages()
   }
 
   const applyPageSize = (value: number) => {
-    pageSize.value = Number(value || 50)
-    currentPage.value = 1
+    data.pageSize.value = Number(value || 50)
+    data.currentPage.value = 1
     fetchImages()
   }
 
   const applySorting = (nextSortBy: AdminImageSortBy, nextOrder: AdminImageSortOrder) => {
-    sortBy.value = nextSortBy
-    sortOrder.value = nextOrder
-    currentPage.value = 1
+    data.sortBy.value = nextSortBy
+    data.sortOrder.value = nextOrder
+    data.currentPage.value = 1
     fetchImages()
   }
 
-  const openAdvancedPanel = () => {
-    advancedPanelOpen.value = true
-  }
-
-  const closeAdvancedPanel = () => {
-    advancedPanelOpen.value = false
-  }
-
   const applyAdvancedFilters = (next: AdminImagesAdvancedFilters) => {
-    advancedFilters.value = { ...next }
-    currentPage.value = 1
+    data.advancedFilters.value = { ...next }
+    data.currentPage.value = 1
     advancedPanelOpen.value = false
     fetchImages()
   }
 
   const resetAdvancedFilters = () => {
-    advancedFilters.value = createDefaultAdvancedFilters()
-    currentPage.value = 1
+    data.advancedFilters.value = createDefaultAdvancedFilters()
+    data.currentPage.value = 1
     fetchImages()
   }
 
-  const changePage = (page: number) => {
-    currentPage.value = Math.max(1, Number(page || 1))
-    fetchImages()
-  }
+  // ── 详情面板 ──
+  const hasPrevDetail = computed(() => detailIndex.value > 0)
+  const hasNextDetail = computed(() => detailIndex.value >= 0 && detailIndex.value < data.images.value.length - 1)
 
   const setDetailByIndex = (index: number) => {
-    if (index < 0 || index >= images.value.length) return false
+    if (index < 0 || index >= data.images.value.length) return false
     detailIndex.value = index
-    selectedImage.value = images.value[index]
+    selectedImage.value = data.images.value[index]
     return true
   }
 
   const openDetailById = (id: string) => {
     const targetId = String(id || '').trim()
     if (!targetId) return
-    const index = images.value.findIndex(item => item.id === targetId)
+    const index = data.images.value.findIndex(item => item.id === targetId)
     if (index < 0) return
     setDetailByIndex(index)
     detailModalOpen.value = true
@@ -423,11 +270,11 @@ export const useAdminImages = () => {
     window.removeEventListener('keydown', handleDetailKeydown)
   })
 
-  watch(images, () => {
+  watch(data.images, () => {
     if (!detailModalOpen.value) return
     const currentId = selectedImage.value?.id
     if (!currentId) return
-    const idx = images.value.findIndex(item => item.id === currentId)
+    const idx = data.images.value.findIndex(item => item.id === currentId)
     if (idx >= 0) {
       setDetailByIndex(idx)
       return
@@ -437,6 +284,7 @@ export const useAdminImages = () => {
     closeDetail()
   })
 
+  // ── 剪贴板 ──
   const copyImageUrl = async (url?: string | null) => {
     const val = String(url || '').trim()
     if (!val) return
@@ -451,7 +299,7 @@ export const useAdminImages = () => {
   const copySelectedUrls = async () => {
     if (!selectedIds.value.length) return
     const selectedSet = new Set(selectedIds.value)
-    const urls = images.value
+    const urls = data.images.value
       .filter(item => selectedSet.has(item.id))
       .map(item => String(item.url || '').trim())
       .filter(Boolean)
@@ -469,6 +317,7 @@ export const useAdminImages = () => {
     }
   }
 
+  // ── 删除对话框 ──
   const openDeleteForSingle = (id: string) => {
     selectedIds.value = [id]
     deleteWithStorage.value = true
@@ -498,28 +347,30 @@ export const useAdminImages = () => {
         && selectedIds.value.includes(selectedImage.value.id)
       )
       const previousDetailIndex = detailIndex.value
-      const deletingCurrentPageAll = images.value.length > 0 && selectedIds.value.length >= images.value.length
 
+      const deletingCurrentPageAll = data.images.value.length > 0 && selectedIds.value.length >= data.images.value.length
+
+      const { deleteImages } = useImageApi()
       await deleteImages(selectedIds.value, {
-        deleteStorage: tgSyncDeleteEnabled.value && deleteWithStorage.value,
+        deleteStorage: data.tgSyncDeleteEnabled.value && deleteWithStorage.value,
       })
 
       notification.success('删除成功', `已删除 ${deletingCount} 张图片`)
       deleteModalOpen.value = false
       clearSelection()
 
-      if (deletingCurrentPageAll && currentPage.value > 1) {
-        currentPage.value -= 1
+      if (deletingCurrentPageAll && data.currentPage.value > 1) {
+        data.currentPage.value -= 1
       }
       await fetchImages({ silent: true })
 
       if (deletingFromDetail) {
-        if (!images.value.length) {
+        if (!data.images.value.length) {
           detailIndex.value = -1
           selectedImage.value = null
           closeDetail()
         } else {
-          const fallbackIndex = Math.max(0, Math.min(previousDetailIndex, images.value.length - 1))
+          const fallbackIndex = Math.max(0, Math.min(previousDetailIndex, data.images.value.length - 1))
           setDetailByIndex(fallbackIndex)
           detailModalOpen.value = true
         }
@@ -534,6 +385,7 @@ export const useAdminImages = () => {
 
   const clearCacheAction = async () => {
     try {
+      const { clearCache } = useImageApi()
       await clearCache()
       notification.success('成功', '缓存已清理')
     } catch (error) {
@@ -542,36 +394,50 @@ export const useAdminImages = () => {
     }
   }
 
+  // ── 高级面板 ──
+  const openAdvancedPanel = () => {
+    advancedPanelOpen.value = true
+  }
+
+  const closeAdvancedPanel = () => {
+    advancedPanelOpen.value = false
+  }
+
+  // ── 初始化 ──
   const initialize = async () => {
     await Promise.all([
-      loadSyncDeleteSetting(),
+      data.loadSyncDeleteSetting(),
       fetchImages({ silent: true }),
     ])
   }
 
   return {
-    loading,
-    refreshing,
+    // 数据状态
+    loading: data.loading,
+    refreshing: data.refreshing,
     deleting,
-    images,
+    images: data.images,
     selectedIds,
     selectedCount,
     isAllOnPageSelected,
     isPagePartiallySelected,
 
-    searchQuery,
-    primaryFilter,
-    sortBy,
-    sortOrder,
-    advancedFilters,
-    hasActiveAdvancedFilters,
-    currentPage,
-    totalPages,
-    totalCount,
-    pageSize,
+    // 查询/筛选
+    searchQuery: data.searchQuery,
+    primaryFilter: data.primaryFilter,
+    sortBy: data.sortBy,
+    sortOrder: data.sortOrder,
+    advancedFilters: data.advancedFilters,
+    hasActiveAdvancedFilters: data.hasActiveAdvancedFilters,
+    currentPage: data.currentPage,
+    totalPages: data.totalPages,
+    totalCount: data.totalCount,
+    pageSize: data.pageSize,
     viewMode,
     advancedPanelOpen,
+    tgSyncDeleteEnabled: data.tgSyncDeleteEnabled,
 
+    // 详情 & 删除面板
     detailModalOpen,
     detailIndex,
     selectedImage,
@@ -580,14 +446,15 @@ export const useAdminImages = () => {
     deleteModalOpen,
     deleteMessage,
     deleteWithStorage,
-    tgSyncDeleteEnabled,
 
-    pageSizeOptions,
-    primaryFilterOptions,
-    sortByOptions,
-    sortOrderOptions,
-    sourceOptions,
+    // 选项常量
+    pageSizeOptions: data.pageSizeOptions,
+    primaryFilterOptions: data.primaryFilterOptions,
+    sortByOptions: data.sortByOptions,
+    sortOrderOptions: data.sortOrderOptions,
+    sourceOptions: data.sourceOptions,
 
+    // 初始化
     initialize,
     fetchImages,
     refresh,
@@ -601,10 +468,12 @@ export const useAdminImages = () => {
     closeAdvancedPanel,
     changePage,
 
+    // 选择
     toggleSelect,
     toggleSelectAllOnPage,
     clearSelection,
 
+    // 详情
     openDetail,
     openDetailById,
     goPrevDetail,
@@ -615,6 +484,7 @@ export const useAdminImages = () => {
     copyImageUrl,
     copySelectedUrls,
 
+    // 删除
     openDeleteForSingle,
     openDeleteForSelection,
     closeDeleteModal,

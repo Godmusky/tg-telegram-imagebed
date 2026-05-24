@@ -5,7 +5,7 @@
  * 统一 XHR 进度回调，Token 模式上传后自动 verifyToken()。
  */
 
-import type { ApiResponse, UploadResult, TokenUploadResult } from '~/types/api'
+import type { ApiResponse, UploadResult, TokenUploadResult, UploadFileResult } from '~/types/api'
 
 export interface UploadProgress {
   label: string
@@ -101,8 +101,8 @@ export const useUpload = () => {
   const uploadFiles = async (
     files: File[],
     onProgress?: (p: UploadProgress) => void
-  ): Promise<(UploadResult | TokenUploadResult)[]> => {
-    const results: (UploadResult | TokenUploadResult)[] = []
+  ): Promise<UploadFileResult[]> => {
+    const results: UploadFileResult[] = []
 
     // 确定上传 URL 和认证方式
     // Token 优先：确保上传记录关联到 token，便于在上传历史和相册中查看
@@ -130,8 +130,16 @@ export const useUpload = () => {
       const { promise } = _xhrUpload(url, files[i], {
         headers, withCredentials, idx: i, total: files.length, onProgress
       })
-      const resp = await promise
-      if (resp.success) results.push(resp.data)
+      try {
+        const resp = await promise
+        if (resp.success && resp.data) results.push(resp.data)
+      } catch (e: any) {
+        results.push({
+          success: false,
+          filename: files[i].name,
+          error: e?.message || '上传失败',
+        })
+      }
     }
 
     // Token 模式上传后自动刷新配额

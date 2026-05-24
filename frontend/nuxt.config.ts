@@ -15,10 +15,21 @@ export default defineNuxtConfig({
     baseURL: '/',
     buildAssetsDir: '/_nuxt/',
     head: {
-      title: '',
+      title: '\u56fe\u5e8a Pro \u2014 \u5feb\u901f\u5b89\u5168\u7684\u56fe\u7247\u6258\u7ba1',
       meta: [
         { charset: 'utf-8' },
         { name: 'viewport', content: 'width=device-width, initial-scale=1' },
+        { 'http-equiv': 'Content-Security-Policy', content: "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; connect-src 'self'" },
+        { name: 'description', content: '\u4e13\u4e1a\u7684\u56fe\u7247\u6258\u7ba1\u670d\u52a1\uff0c\u57fa\u4e8e Telegram \u4e91\u5b58\u50a8\uff0c\u652f\u6301 Cloudflare CDN \u5168\u7403\u52a0\u901f\u3002\u5feb\u901f\u4e0a\u4f20\u3001\u5b89\u5168\u5b58\u50a8\u3001\u4fbf\u6377\u5206\u4eab\u3002' },
+        { name: 'keywords', content: '\u56fe\u5e8a,\u514d\u8d39\u56fe\u5e8a,Telegram,\u4e91\u5b58\u50a8,CDN\u52a0\u901f,\u56fe\u7247\u6258\u7ba1' },
+        { name: 'robots', content: 'index, follow' },
+        { property: 'og:title', content: '\u56fe\u5e8a Pro \u2014 \u5feb\u901f\u5b89\u5168\u7684\u56fe\u7247\u6258\u7ba1' },
+        { property: 'og:description', content: '\u4e13\u4e1a\u7684\u56fe\u7247\u6258\u7ba1\u670d\u52a1\uff0c\u57fa\u4e8e Telegram \u4e91\u5b58\u50a8\uff0c\u652f\u6301 Cloudflare CDN \u5168\u7403\u52a0\u901f\u3002' },
+        { property: 'og:type', content: 'website' },
+        { property: 'og:locale', content: 'zh_CN' },
+        { name: 'twitter:card', content: 'summary_large_image' },
+        { name: 'twitter:title', content: '\u56fe\u5e8a Pro \u2014 \u5feb\u901f\u5b89\u5168\u7684\u56fe\u7247\u6258\u7ba1' },
+        { name: 'twitter:description', content: '\u4e13\u4e1a\u7684\u56fe\u7247\u6258\u7ba1\u670d\u52a1\uff0c\u57fa\u4e8e Telegram \u4e91\u5b58\u50a8\uff0c\u652f\u6301 Cloudflare CDN \u5168\u7403\u52a0\u901f\u3002' },
       ],
       link: [
         { rel: 'icon', type: 'image/x-icon', href: '/favicon.ico' }
@@ -42,7 +53,16 @@ export default defineNuxtConfig({
 
   // Nitro 配置（静态生成）
   nitro: {
-    preset: 'static'
+    preset: 'static',
+    prerender: {
+      crawlLinks: true,
+      routes: [
+        '/',
+        '/gallery-site/',
+        '/gallery-site/galleries',
+        '/docs',
+      ]
+    }
   },
 
   // UI 配置

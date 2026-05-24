@@ -8,13 +8,8 @@ export const useImageApi = () => {
   const config = useRuntimeConfig()
   const baseURL = config.public.apiBase
   const getStats = async (): Promise<PublicStats> => {
-    try {
-      const response = await $fetch<ApiResponse<PublicStats>>(`${baseURL}/api/stats`)
-      return response.data || {} as PublicStats
-    } catch (error) {
-      console.error('获取统计信息失败:', error)
-      return {} as PublicStats
-    }
+    const response = await $fetch<ApiResponse<PublicStats>>(`${baseURL}/api/stats`)
+    return response.data || {} as PublicStats
   }
 
   // 获取管理员统计信息
@@ -47,7 +42,7 @@ export const useImageApi = () => {
   // 删除图片
   const deleteImages = async (ids: string[], opts?: { deleteStorage?: boolean }) => {
     try {
-      const body: Record<string, any> = { ids }
+      const body: { ids: string[]; delete_storage?: boolean } = { ids }
       if (opts?.deleteStorage !== undefined) {
         body.delete_storage = opts.deleteStorage
       }
