@@ -19,7 +19,7 @@ export default defineNuxtConfig({
       meta: [
         { charset: 'utf-8' },
         { name: 'viewport', content: 'width=device-width, initial-scale=1' },
-        { 'http-equiv': 'Content-Security-Policy', content: "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; connect-src 'self'" },
+        { 'http-equiv': 'Content-Security-Policy', content: "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; connect-src 'self'; font-src 'self' data:; frame-src 'self'" },
         { name: 'description', content: '\u4e13\u4e1a\u7684\u56fe\u7247\u6258\u7ba1\u670d\u52a1\uff0c\u57fa\u4e8e Telegram \u4e91\u5b58\u50a8\uff0c\u652f\u6301 Cloudflare CDN \u5168\u7403\u52a0\u901f\u3002\u5feb\u901f\u4e0a\u4f20\u3001\u5b89\u5168\u5b58\u50a8\u3001\u4fbf\u6377\u5206\u4eab\u3002' },
         { name: 'keywords', content: '\u56fe\u5e8a,\u514d\u8d39\u56fe\u5e8a,Telegram,\u4e91\u5b58\u50a8,CDN\u52a0\u901f,\u56fe\u7247\u6258\u7ba1' },
         { name: 'robots', content: 'index, follow' },
