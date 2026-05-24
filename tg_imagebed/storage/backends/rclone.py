@@ -110,6 +110,9 @@ class RcloneBackend(StorageBackend):
         self.name = name
         self._rclone_bin = (rclone_bin or "rclone").strip()
         self._config_path = (config_path or "").strip()
+        # 防止路径遍历：拒绝含 .. 的相对路径穿越
+        if self._config_path and ".." in self._config_path:
+            raise ValueError(f"rclone config_path 包含非法路径穿越: {self._config_path!r}")
         self._remote = (remote or "").strip().rstrip(":")
         self._base_path = (base_path or "").strip()
         self._cli_flags = list(cli_flags or [])

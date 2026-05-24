@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """数据库连接管理 + 初始化"""
+import os
 import sqlite3
 import time
 import random
@@ -24,6 +25,13 @@ def _get_db_path() -> str:
 def get_connection():
     """获取数据库连接的上下文管理器"""
     conn = sqlite3.connect(_get_db_path())
+    # 确保数据库文件权限为 600（仅所有者可读写）
+    _db_path = _get_db_path()
+    if os.path.exists(_db_path):
+        try:
+            os.chmod(_db_path, 0o600)
+        except OSError:
+            pass
     conn.row_factory = sqlite3.Row
     conn.execute('PRAGMA foreign_keys = ON')
     conn.execute('PRAGMA busy_timeout = 5000')
