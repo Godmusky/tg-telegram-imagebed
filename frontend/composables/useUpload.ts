@@ -57,6 +57,7 @@ export const useUpload = () => {
       })
       xhr.addEventListener('error', () => { cleanup(); reject(new Error('网络错误')) })
       xhr.addEventListener('abort', () => { cleanup(); reject(new Error('上传已取消')) })
+      xhr.addEventListener('timeout', () => { cleanup(); reject(new Error('上传超时，文件可能较大或网络较慢，请重试')) })
 
       if (opts.onProgress) {
         xhr.upload.addEventListener('progress', (e) => {
@@ -76,6 +77,7 @@ export const useUpload = () => {
       if (opts.headers) {
         for (const [k, v] of Object.entries(opts.headers)) xhr.setRequestHeader(k, v)
       }
+      xhr.timeout = 120000  // 2 分钟上传超时
       xhr.send(fd)
     })
 

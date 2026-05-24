@@ -6,9 +6,11 @@
 export default defineNuxtPlugin((nuxtApp) => {
   const authStore = useAuthStore()
 
-  // 通过 $fetch.create() 创建带拦截器的实例，处理管理后台 API 的 401 和超时
+  // 通过 $fetch.create() 创建带拦截器的实例，处理管理后台 API 的 401、超时和重试
   const apiFetch = $fetch.create({
     timeout: 15000,
+    retry: 2,
+    retryDelay: 1000,
     onResponseError({ request, response }) {
       if (response.status === 401) {
         // 仅拦截管理后台 API 的 401
