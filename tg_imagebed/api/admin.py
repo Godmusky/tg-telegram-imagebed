@@ -6,11 +6,17 @@
 路由已按功能拆分到子模块：
 - admin_helpers: 共享辅助函数（_admin_json, _admin_options, _get_cdn_domain）
 - admin_setup: 初始化设置（/api/setup/*）
+- admin_auth: 管理员认证（login/logout/csrf-token）
 - admin_cdn: CDN 管理（/api/admin/cdn/*）
 - admin_storage: 存储配置（/api/admin/storage/*, /api/admin/upload）
 - admin_tokens: Token 管理（/api/admin/tokens/*）
 - admin_telegram: Telegram Bot 配置（/api/admin/telegram/*）
 - admin_galleries: 画集管理（/api/admin/galleries/*）
+- admin_images: 图片管理（/api/admin/stats, /api/admin/images, /api/admin/delete）
+- admin_sessions: 会话管理（安全日志/活跃会话/心跳/踢出）
+- admin_sso: 画集域名 SSO
+- admin_domains: 域名管理
+- admin_dashboard: 仪表盘
 - admin_update: 系统热更新（/api/admin/update/*）
 
 本文件保留：管理员账号设置 + 公告管理
@@ -31,8 +37,11 @@ from . import admin_storage    # noqa: F401
 from . import admin_tokens     # noqa: F401
 from . import admin_telegram   # noqa: F401
 from . import admin_galleries  # noqa: F401
+from . import admin_images    # noqa: F401
 from . import admin_domains    # noqa: F401
 from . import admin_dashboard  # noqa: F401
+from . import admin_sessions   # noqa: F401
+from . import admin_sso        # noqa: F401
 from . import admin_update     # noqa: F401
 
 
