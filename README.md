@@ -19,6 +19,7 @@
 - 上传场景路由：可分别为 `guest / token / group / admin` 指定不同后端。
 - 管理后台：系统设置、存储配置、Token 管理、CDN 配置、画集管理、应用更新。
 - 游客上传、Token 上传、TG 登录绑定、TG 用户限额与会话控制。
+- Token 安全存储：前端使用 Web Crypto API AES-GCM 加密，密钥仅存会话级别。支持旧格式自动迁移。
 - Telegram Bot：轮询 / Webhook、群组上传、私聊上传、上传历史、删除控制。
 - Cloudflare CDN：缓存监控、重定向、延迟回源、图片专用域名限制。
 - 画集系统：公开 / 私有 / Token / 密码访问模式。
