@@ -1,0 +1,31 @@
+services:
+  telegram-imagebed:
+    build: .
+    image: telegram-imagebed:latest
+    container_name: telegram-imagebed
+    ports:
+      - "18793:18793"
+    # ============================================================
+    # 数据卷 — 持久化容器内 /app/data 目录到宿主机 ./data
+    #
+    # /app/data 目录内含全部持久化数据，不映射会导致重启丢失：
+    #   - telegram_imagebed.db   SQLite 数据库（Token、用户、设置等）
+    #   - telegram_imagebed.log  运行日志
+    #   - .secret_key            会话加密密钥（丢失后所有 session 失效）
+    #   - uploads/               使用 local 存储后端时的上传文件
+    #   - tmp/                   Kurigram 大文件下载临时目录
+    #
+    # 强烈建议对宿主机 ./data 目录做定期备份。
+    # ============================================================
+    volumes:
+      - ./data:/app/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:18793/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+# 项目名称（避免中文路径问题）
+name: telegram-imagebed
