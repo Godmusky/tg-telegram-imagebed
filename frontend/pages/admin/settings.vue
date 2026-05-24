@@ -474,6 +474,13 @@
         <div v-else class="space-y-6">
           <!-- 基础配置 -->
           <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <UFormGroup label="CDN 域名">
+              <UInput v-model="settings.cloudflare_cdn_domain" placeholder="例如: cdn.example.com" />
+              <template #hint>
+                <span class="text-xs text-stone-500">用于图片访问的 Cloudflare 加速域名</span>
+              </template>
+            </UFormGroup>
+
             <UFormGroup label="Zone ID">
               <UInput v-model="settings.cloudflare_zone_id" placeholder="Cloudflare Zone ID" />
             </UFormGroup>
