@@ -17,6 +17,16 @@ export const useUpload = () => {
   const authStore = useAuthStore()
   const tokenStore = useTokenStore()
 
+  // 从 cookie 读取 CSRF token（XHR 不走 $fetch 包装器，需手动加）
+  const getCsrfTokenFromCookie = (): string => {
+    if (typeof document === 'undefined') return ''
+    for (const c of document.cookie.split(';')) {
+      const [k, ...v] = c.trim().split('=')
+      if (k === 'csrf_token') return decodeURIComponent(v.join('='))
+    }
+    return ''
+  }
+
   // 用 Map 按文件名跟踪 XHR，避免多文件并发时的竞态问题
   const _xhrMap = new Map<string, XMLHttpRequest>()
 
@@ -122,6 +132,9 @@ export const useUpload = () => {
     } else if (authStore.isAuthenticated) {
       url = `${config.public.apiBase}/api/admin/upload`
       withCredentials = true
+      // XHR 不走 $fetch 包装器，需手动加 CSRF Token
+      const csrfToken = getCsrfTokenFromCookie()
+      if (csrfToken) headers = { 'X-CSRF-Token': csrfToken }
       mode = 'admin'
     } else {
       url = `${config.public.apiBase}/api/upload`
