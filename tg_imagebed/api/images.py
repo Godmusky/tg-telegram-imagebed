@@ -125,19 +125,28 @@ def get_image(encrypted_id):
         # 更新访问计数
         update_access_count(encrypted_id)
 
-        # 通过存储后端获取图片
+        # 通过存储后端获取图片（传递 Range 头支持断点续传/分块加载）
         router = get_storage_router()
         backend = router.get_backend_for_record(file_info)
-        dl = backend.download(file_info=file_info)
+        range_header = request.headers.get('Range')
+        dl = backend.download(file_info=file_info, range_header=range_header)
         if not dl:
             return jsonify({'success': False, 'error': 'Image not available'}), 404
 
         mime_type = dl.content_type or file_info.get('mime_type') or 'application/octet-stream'
-        file_size = file_info.get('file_size') or 0
         original_filename = file_info.get('original_filename') or 'image'
 
         response = Response(dl.body, status=dl.status_code, content_type=mime_type)
-        response.headers['Content-Length'] = str(file_size)
+        # 优先使用后端返回的 Content-Length（206 时为 range 实际大小），
+        # 后端未提供时才用数据库中的完整 file_size
+        if 'Content-Length' in dl.headers:
+            response.headers['Content-Length'] = dl.headers['Content-Length']
+        else:
+            file_size = file_info.get('file_size') or 0
+            response.headers['Content-Length'] = str(file_size)
+        # 转发后端返回的 Content-Range（206 Partial Content 必须）
+        if 'Content-Range' in dl.headers:
+            response.headers['Content-Range'] = dl.headers['Content-Range']
         response.headers['Content-Disposition'] = f'inline; filename="{original_filename}"'
         return add_cache_headers(response, cache_policy, cache_seconds)
 
