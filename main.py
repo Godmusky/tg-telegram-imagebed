@@ -107,7 +107,7 @@ def create_app() -> Flask:
         r"/api/admin/*": {
             "origins": admin_origins,
             "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-            "allow_headers": ["Content-Type", "Authorization", "X-Requested-With"],
+            "allow_headers": ["Content-Type", "Authorization", "X-Requested-With", "X-CSRF-Token"],
             "supports_credentials": True,
             "vary_header": True,
             "max_age": 3600

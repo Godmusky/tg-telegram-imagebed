@@ -21,6 +21,7 @@
 
 settings 模块同时注册 admin_bp 和 images_bp 路由：
 - settings: 系统设置 + Token 撤销（/api/admin/system/settings, /api/admin/tokens/revoke）
+- galleries: 画集访问控制（/api/admin/galleries/<id>/access, /api/admin/galleries/<id>/access-tokens, /api/admin/share-all）
 
 本文件保留：管理员账号设置 + 公告管理
 """
@@ -33,9 +34,10 @@ from ..database import get_announcement, update_announcement
 from .. import admin_module
 
 # 导入子模块以注册路由（副作用导入）
-# 注意：settings 同时在 __init__.py 导入以注册 images_bp 公共路由，
+# 注意：settings / galleries 同时在 __init__.py 导入以注册各自的其他蓝图路由，
 # 此处单独导入确保 admin_bp 路由不依赖 __init__.py 的加载顺序
 from . import settings        # noqa: F401  ── system/settings + tokens/revoke
+from . import galleries       # noqa: F401  ── 画集访问控制（3个admin路由）
 from . import admin_setup      # noqa: F401
 from . import admin_auth       # noqa: F401  ── login/logout/csrf-token 路由
 from . import admin_cdn        # noqa: F401
