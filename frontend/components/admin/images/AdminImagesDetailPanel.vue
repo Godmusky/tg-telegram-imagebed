@@ -51,7 +51,7 @@
           <div class="rounded-xl border border-stone-200/80 bg-white/70 p-3 dark:border-neutral-700/80 dark:bg-neutral-900/70">
             <p class="text-xs text-stone-500 dark:text-stone-400">链接</p>
             <code class="mt-1 block break-all rounded-lg bg-stone-100 px-2.5 py-2 text-xs text-stone-700 dark:bg-neutral-800 dark:text-stone-200">
-              {{ image.url }}
+              {{ image.share_url || image.url }}
             </code>
           </div>
         </section>

@@ -24,7 +24,7 @@
           <p class="truncate text-xs font-medium text-white">{{ image.filename }}</p>
           <div class="mt-2 flex items-center gap-1 opacity-100 sm:opacity-0 sm:transition-opacity sm:group-hover:opacity-100">
             <UButton icon="heroicons:eye" color="white" size="xs" @click="$emit('view-detail', image)" />
-            <UButton icon="heroicons:link" color="white" size="xs" @click="$emit('copy-url', image.url)" />
+            <UButton icon="heroicons:link" color="white" size="xs" @click="$emit('copy-url', image.share_url || image.url)" />
             <UButton icon="heroicons:trash" color="red" size="xs" @click="$emit('delete', image.id)" />
           </div>
         </div>

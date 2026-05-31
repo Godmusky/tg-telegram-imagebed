@@ -301,7 +301,7 @@ export const useAdminImages = () => {
     const selectedSet = new Set(selectedIds.value)
     const urls = data.images.value
       .filter(item => selectedSet.has(item.id))
-      .map(item => String(item.url || '').trim())
+      .map(item => String(item.share_url || item.url || '').trim())
       .filter(Boolean)
 
     if (!urls.length) {

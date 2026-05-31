@@ -68,7 +68,7 @@
           <td class="py-2.5 text-right">
             <div class="flex items-center justify-end gap-1">
               <UButton icon="heroicons:eye" color="gray" variant="ghost" size="xs" @click="$emit('view-detail', image)" />
-              <UButton icon="heroicons:link" color="gray" variant="ghost" size="xs" @click="$emit('copy-url', image.url)" />
+              <UButton icon="heroicons:link" color="gray" variant="ghost" size="xs" @click="$emit('copy-url', image.share_url || image.url)" />
               <UButton icon="heroicons:trash" color="red" variant="ghost" size="xs" @click="$emit('delete', image.id)" />
             </div>
           </td>

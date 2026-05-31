@@ -131,7 +131,7 @@
           :has-prev="hasPrevDetail"
           :has-next="hasNextDetail"
           @close="closeDetail"
-          @copy="copyImageUrl(selectedImage?.url)"
+          @copy="copyImageUrl(selectedImage?.share_url || selectedImage?.url)"
           @prev="goPrevDetail"
           @next="goNextDetail"
           @download="downloadImage(selectedImage)"

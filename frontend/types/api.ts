@@ -143,6 +143,7 @@ export interface AdminImageItem {
   cdn_hit_count: number
   direct_hit_count: number
   url: string
+  share_url: string
   cdn_url: string | null
   id: string
   filename: string
