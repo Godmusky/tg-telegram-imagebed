@@ -88,7 +88,7 @@
               <a
                 v-for="item in uploads"
                 :key="item.encrypted_id"
-                :href="item.cdn_url || item.image_url"
+                :href="item.share_url || item.cdn_url || item.image_url"
                 target="_blank"
                 rel="noopener noreferrer"
                 class="flex items-center justify-between rounded-lg border border-stone-200/80 px-2.5 py-2 text-sm transition hover:border-amber-300 dark:border-neutral-700/80 dark:hover:border-amber-700/60"

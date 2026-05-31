@@ -200,6 +200,7 @@ def admin_token_uploads_api(token_id: int):
         cdn_enabled = str(get_system_setting('cdn_enabled') or '0') == '1'
         for item in data['items']:
             item['image_url'] = f"{base_url}/image/{item['encrypted_id']}"
+            item['share_url'] = f"{base_url}/view/{item['encrypted_id']}"
             if cdn_enabled and cdn_domain:
                 item['cdn_url'] = f"https://{cdn_domain}/image/{item['encrypted_id']}"
 

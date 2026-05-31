@@ -153,7 +153,7 @@
                 variant="ghost"
                 size="xs"
                 title="复制 URL"
-                @click="clipboardCopy(item.image_url, '已复制 URL')"
+                @click="clipboardCopy(item.share_url || item.image_url, '已复制 URL')"
               />
               <UDropdown
                 :items="getCopyMenuItems(item)"
@@ -174,7 +174,7 @@
                 variant="ghost"
                 size="xs"
                 title="新窗口打开"
-                @click="openInNewTab(item.image_url)"
+                @click="openInNewTab(item.share_url || item.image_url)"
               />
             </div>
           </div>
@@ -261,7 +261,9 @@ const clearFilters = () => {
 }
 
 const formatLink = (item: TokenUploadItem, format: string) => {
-  const url = item.image_url
+  const embedUrl = item.image_url
+  const shareUrl = item.share_url || item.image_url
+  const url = format === 'url' ? shareUrl : embedUrl
   const name = item.original_filename || 'image'
   switch (format) {
     case 'markdown': return `![${name}](${url})`

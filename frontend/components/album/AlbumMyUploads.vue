@@ -208,7 +208,7 @@ const toggleSelectAll = () => {
 const copySelectedLinks = () => {
   const links = filteredImages.value
     .filter(img => selectedIds.value.includes(img.encrypted_id))
-    .map(img => img.image_url)
+    .map(img => img.share_url || img.image_url)
     .join('\n')
   clipboardCopy(links, `已复制 ${selectedIds.value.length} 个链接`)
 }
@@ -231,6 +231,7 @@ const loadUploads = async () => {
       cdn_cached: item.cdn_cached || false,
       mime_type: item.mime_type || '',
       image_url: item.image_url || `${baseURL}/image/${item.encrypted_id || item.file_id}`,
+      share_url: item.share_url || `${baseURL}/view/${item.encrypted_id || item.file_id}`,
       added_at: item.created_at
     } as GalleryImage))
     total.value = data.total_uploads || 0

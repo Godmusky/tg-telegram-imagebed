@@ -244,12 +244,14 @@ def admin_upload():
         return _admin_json({'success': False, 'error': '上传失败'}, 500)
 
     base_url = get_image_domain(request, scene='admin')
+    view_url = f"{base_url}/view/{result['encrypted_id']}"
     url = f"{base_url}/image/{result['encrypted_id']}"
 
     return _admin_json({
         'success': True,
         'data': {
             'url': url,
+            'share_url': view_url,
             'encrypted_id': result['encrypted_id'],
             'filename': f.filename,
             'size': format_size(result['file_size']),

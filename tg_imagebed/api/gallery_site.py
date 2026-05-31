@@ -215,6 +215,7 @@ def gallery_site_detail(gallery_id):
         base_url = get_image_domain(request)
         for img in images:
             img['url'] = f"{base_url}/image/{img['encrypted_id']}"
+            img['share_url'] = f"{base_url}/view/{img['encrypted_id']}"
 
         total = gallery['image_count']
         response = jsonify({
@@ -999,6 +1000,7 @@ def gallery_admin_detail(gallery_id):
         # 构建图片 URL
         for img in images_data.get('items', []):
             img['url'] = f"{base_url}/image/{img['encrypted_id']}"
+            img['share_url'] = f"{base_url}/view/{img['encrypted_id']}"
 
         response = jsonify({
             'success': True,
@@ -1177,6 +1179,7 @@ def gallery_admin_images(gallery_id):
             base_url = get_image_domain(request)
             for item in result.get('items', []):
                 item['url'] = f"{base_url}/image/{item['encrypted_id']}"
+                item['share_url'] = f"{base_url}/view/{item['encrypted_id']}"
             response = jsonify({
                 'success': True,
                 'data': {
@@ -1294,6 +1297,7 @@ def gallery_admin_images_list():
         base_url = get_image_domain(request)
         for img in rows:
             img['url'] = f"{base_url}/image/{img['encrypted_id']}"
+            img['share_url'] = f"{base_url}/view/{img['encrypted_id']}"
             img['cdn_url'] = None
 
         response = jsonify({

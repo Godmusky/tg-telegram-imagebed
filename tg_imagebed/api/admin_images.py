@@ -357,6 +357,7 @@ def admin_images():
 
         for img in images:
             img['url'] = f"{base_url}/image/{img['encrypted_id']}"
+            img['share_url'] = f"{base_url}/view/{img['encrypted_id']}"
             if cdn_enabled and cdn_domain:
                 img['cdn_url'] = f"https://{cdn_domain}/image/{img['encrypted_id']}"
             else:

@@ -69,7 +69,7 @@
           <button
             class="w-7 h-7 rounded-md bg-white/90 dark:bg-neutral-800/90 backdrop-blur-sm flex items-center justify-center hover:bg-white transition-colors"
             title="复制链接"
-            @click="copyLink(image.image_url)"
+            @click="copyLink(image.share_url || image.image_url)"
           >
             <UIcon name="heroicons:clipboard-document" class="w-3.5 h-3.5 text-stone-600 dark:text-stone-300" />
           </button>

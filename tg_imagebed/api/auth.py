@@ -313,6 +313,7 @@ def get_token_uploads_api():
         base_url = get_image_domain(request)
         for upload in uploads:
             upload['image_url'] = f"{base_url}/image/{upload['encrypted_id']}"
+            upload['share_url'] = f"{base_url}/view/{upload['encrypted_id']}"
             if upload.get('created_at'):
                 try:
                     dt = datetime.fromisoformat(upload['created_at'].replace('Z', '+00:00'))

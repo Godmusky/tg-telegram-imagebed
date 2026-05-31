@@ -176,6 +176,7 @@ def gallery_images(gallery_id: int):
         base_url = get_image_domain(request)
         for item in result['items']:
             item['image_url'] = f"{base_url}/image/{item['encrypted_id']}"
+            item['share_url'] = f"{base_url}/view/{item['encrypted_id']}"
         return _json_response({'success': True, 'data': result})
 
     data = request.get_json(silent=True) or {}
