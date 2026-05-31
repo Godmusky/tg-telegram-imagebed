@@ -202,7 +202,7 @@
             <div class="relative">
               <p class="text-xs font-medium text-stone-500 dark:text-stone-400 uppercase tracking-wider mb-2">运行时间</p>
               <p class="text-3xl font-bold text-stone-900 dark:text-white">
-                {{ stats.uptime || "--" }}
+                {{ formatUptime(stats.uptime) }}
               </p>
             </div>
           </div>
@@ -249,6 +249,25 @@ const showTgLogin = ref(false)
 
 // 统计数据
 const stats = ref<any>({})
+
+// 格式化运行时间（秒 → 可读）
+const formatUptime = (seconds: string | number | undefined): string => {
+  if (!seconds) return '--'
+  const total = Number(seconds)
+  if (isNaN(total) || total < 0) return '--'
+
+  const days = Math.floor(total / 86400)
+  const hours = Math.floor((total % 86400) / 3600)
+  const minutes = Math.floor((total % 3600) / 60)
+  const secs = total % 60
+
+  const parts: string[] = []
+  if (days > 0) parts.push(`${days} 天`)
+  if (hours > 0) parts.push(`${hours} 小时`)
+  if (minutes > 0) parts.push(`${minutes} 分`)
+  if (days === 0) parts.push(`${secs} 秒`)  // 小于1天时显示秒数
+  return parts.join(' ') || '--'
+}
 
 // 页面可见性检测
 const visibility = useDocumentVisibility()
