@@ -77,7 +77,7 @@ def _format_batch_summary(
     failure_count: int,
 ) -> str:
     """格式化批量上传汇总消息（自动截断以避免超过4096字符）"""
-    lines = [f"✅ <b>批量上传完成</b> (成功: {success_count} / 总数: {total_count})"]
+    lines = [f"✅ **批量上传完成** (成功: {success_count} / 总数: {total_count})"]
 
     if urls:
         lines.append("")
