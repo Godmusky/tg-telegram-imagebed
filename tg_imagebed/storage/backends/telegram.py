@@ -463,54 +463,82 @@ class TelegramBackend(StorageBackend):
         file_size: int,
         caption: str,
     ) -> Optional[PutResult]:
-        """沿用现有 Bot API 上传逻辑"""
-        # Telegram 对 sendPhoto 有 10MB 限制，超过使用 sendDocument
-        if file_size <= _BOT_API_PHOTO_LIMIT and content_type.startswith('image/'):
-            files = {'photo': (filename, file_content, content_type)}
+        """沿用现有 Bot API 上传逻辑，sendPhoto 失败时自动降级 sendDocument"""
+
+        def _do_upload(method: str) -> Optional[dict]:
+            """执行一次上传，返回 Telegram API 响应的 result dict，失败返回 None"""
+            files_key = 'photo' if method == 'sendPhoto' else 'document'
+            files = {files_key: (filename, file_content, content_type)}
             data = {'chat_id': self._chat_id, 'caption': caption or ''}
-            resp = self._session.post(
-                f"https://api.telegram.org/bot{self._bot_token}/sendPhoto",
-                files=files,
-                data=data,
-                timeout=60,
-            )
-        else:
-            files = {'document': (filename, file_content, content_type)}
-            data = {'chat_id': self._chat_id, 'caption': caption or ''}
-            resp = self._session.post(
-                f"https://api.telegram.org/bot{self._bot_token}/sendDocument",
-                files=files,
-                data=data,
-                timeout=120,
-            )
-
-        if not resp.ok:
-            logger.error(f"Telegram 上传失败: HTTP {resp.status_code}")
-            return None
-
-        payload = resp.json() or {}
-        if not payload.get('ok'):
-            logger.error(f"Telegram 上传失败: {payload.get('description')}")
-            return None
-
-        result = payload.get('result') or {}
-
-        if file_size <= _BOT_API_PHOTO_LIMIT and content_type.startswith('image/'):
-            photos = result.get('photo') or []
-            if not photos:
-                logger.error("Telegram 上传失败: 无法获取 photo")
+            timeout = 60 if method == 'sendPhoto' else 120
+            try:
+                resp = self._session.post(
+                    f"https://api.telegram.org/bot{self._bot_token}/{method}",
+                    files=files,
+                    data=data,
+                    timeout=timeout,
+                )
+            except Exception as e:
+                logger.warning(f"Telegram {method} 请求异常: {e}")
                 return None
-            file_id = photos[-1].get('file_id')
-        else:
-            doc = result.get('document') or {}
-            file_id = doc.get('file_id')
 
+            if not resp.ok:
+                logger.warning(f"Telegram {method} HTTP {resp.status_code}，准备降级")
+                desc = "(no body)"
+                try:
+                    body = resp.json() or {}
+                    desc = body.get('description') or desc
+                except Exception:
+                    pass
+                logger.warning(f"  → 响应: {desc}")
+                return None
+
+            payload = resp.json() or {}
+            if not payload.get('ok'):
+                logger.warning(f"Telegram {method} API 返回错误: {payload.get('description')}，准备降级")
+                return None
+
+            return payload.get('result')
+
+        # 优先尝试 sendPhoto（仅对符合条件的小图片）
+        use_photo = file_size <= _BOT_API_PHOTO_LIMIT and content_type.startswith('image/')
+        if use_photo:
+            result = _do_upload('sendPhoto')
+            if result:
+                photos = result.get('photo') or []
+                if photos:
+                    file_id = photos[-1].get('file_id')
+                    if file_id:
+                        file_path = self._get_file_path(file_id) or ''
+                        logger.info(f"Telegram 上传成功(sendPhoto): {file_id}")
+                        return PutResult(
+                            file_id=file_id,
+                            file_path=file_path,
+                            file_size=file_size,
+                            storage_backend=self.name,
+                            storage_key=file_id,
+                            storage_meta={
+                                'file_path': file_path,
+                                'uploaded_at': int(time.time()),
+                                'message_id': result.get('message_id'),
+                            },
+                        )
+            logger.info("sendPhoto 失败，降级到 sendDocument")
+
+        # sendDocument 兜底
+        result = _do_upload('sendDocument')
+        if not result:
+            logger.error("Telegram 上传失败: sendDocument 也失败了")
+            return None
+
+        doc = result.get('document') or {}
+        file_id = doc.get('file_id')
         if not file_id:
-            logger.error("Telegram 上传失败: 无法获取 file_id")
+            logger.error("Telegram 上传失败: sendDocument 无法获取 file_id")
             return None
 
         file_path = self._get_file_path(file_id) or ''
-        logger.info(f"Telegram 存储上传成功(Bot API): {file_id}")
+        logger.info(f"Telegram 上传成功(sendDocument): {file_id}")
 
         return PutResult(
             file_id=file_id,
@@ -522,7 +550,6 @@ class TelegramBackend(StorageBackend):
                 'file_path': file_path,
                 'uploaded_at': int(time.time()),
                 'message_id': result.get('message_id'),
-                'upload_transport': 'bot_api',
             },
         )
 

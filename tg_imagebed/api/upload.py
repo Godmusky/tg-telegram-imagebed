@@ -176,14 +176,16 @@ def upload_file():
 
         # 生成 URL
         base_url = get_image_domain(request, scene='guest')
-        permanent_url = f"{base_url}/view/{result['encrypted_id']}"
+        image_url = f"{base_url}/image/{result['encrypted_id']}"
+        share_url = f"{base_url}/view/{result['encrypted_id']}"
 
         logger.info(f"Web上传完成: {file.filename} -> {result['encrypted_id']}")
 
         return add_cache_headers(jsonify({
             'success': True,
             'data': {
-                'url': permanent_url,
+                'url': image_url,
+                'share_url': share_url,
                 'filename': file.filename,
                 'size': format_size(result['file_size']),
                 'upload_time': time.strftime('%Y-%m-%d %H:%M:%S')

@@ -34,7 +34,7 @@
             icon="heroicons:clipboard-document"
             color="white"
             size="sm"
-            @click="copyUrl(image.url)"
+            @click="copyUrl(image.share_url || image.url)"
           />
         </div>
       </div>
@@ -102,11 +102,11 @@ const getFormattedLinks = (format: string) => {
   return props.images
     .map((img) => {
       switch (format) {
-        case 'url': return img.url
+        case 'url': return img.share_url || img.url
         case 'markdown': return `![${img.filename}](${img.url})`
         case 'html': return `<img src="${img.url}" alt="${img.filename}" />`
         case 'bbcode': return `[img]${img.url}[/img]`
-        default: return img.url
+        default: return img.share_url || img.url
       }
     })
     .join('\n')
