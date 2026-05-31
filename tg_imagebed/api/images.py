@@ -65,7 +65,8 @@ def get_image(encrypted_id):
         # 域名限制检查
         try:
             from ..database import is_allowed_image_domain
-            if not is_allowed_image_domain(request):
+            host = (request.headers.get('X-Forwarded-Host') or request.host or '').split(':')[0].lower()
+            if not is_allowed_image_domain(host):
                 return jsonify({'success': False, 'error': 'Domain not allowed'}), 403
         except ImportError as e:
             logger.warning(f"域名验证模块导入失败，默认拒绝访问: {e}")
