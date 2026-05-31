@@ -406,7 +406,7 @@ async def handle_photo(update: Update, context):
         if result:
             _inc_bot_stats(success=1)
             base_url = get_image_domain(None, scene='guest')
-            permanent_url = f"{base_url}/image/{result['encrypted_id']}"
+            permanent_url = f"{base_url}/view/{result['encrypted_id']}"
 
             link_formats = str(get_system_setting('bot_reply_link_formats') or 'url')
             text, parse_mode = _build_reply_text(result, permanent_url, filename, get_system_setting)

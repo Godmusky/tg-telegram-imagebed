@@ -186,7 +186,7 @@ async def _flush_media_group(
                 failure_count += 1
                 continue
 
-            urls.append(f"{base_url}/image/{result['encrypted_id']}")
+            urls.append(f"{base_url}/view/{result['encrypted_id']}")
             total_size_bytes += int(result.get("file_size", 0) or 0)
         except Exception as e:
             failure_count += 1
