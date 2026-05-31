@@ -928,7 +928,7 @@ const lightboxImages = computed(() =>
 )
 const openLightbox = (idx: number) => { lightboxIndex.value = idx; lightboxOpen.value = true }
 const handleLightboxCopyLink = (image: any) => {
-  const url = image.image_url || image.cdn_url
+  const url = image.share_url || image.image_url || image.cdn_url
   if (url) void clipboardCopy(url, '图片链接已复制')
 }
 

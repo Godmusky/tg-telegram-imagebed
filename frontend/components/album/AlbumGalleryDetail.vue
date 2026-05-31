@@ -695,7 +695,7 @@ const copySelectedLinks = () => {
   if (selectedIds.value.length === 0) return
   const links = images.value
     .filter(img => selectedIds.value.includes(img.encrypted_id))
-    .map(img => img.image_url)
+    .map(img => img.share_url || img.image_url)
     .join('\n')
   clipboardCopy(links, `已复制 ${selectedIds.value.length} 个链接`)
 }

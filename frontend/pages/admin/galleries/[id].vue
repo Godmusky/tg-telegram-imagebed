@@ -1097,6 +1097,7 @@ const loadUserImages = async () => {
       .map((img: any) => ({
         encrypted_id: img.encrypted_id,
         url: img.url,
+        share_url: img.share_url || `${baseURL}/view/${img.encrypted_id}`,
         cdn_url: img.cdn_url,
         cdn_cached: Boolean(img.cdn_cached ?? img.cached),
         original_filename: img.original_filename || img.filename || img.encrypted_id
@@ -1233,7 +1234,7 @@ const openLightbox = (idx: number) => {
 }
 
 const handleLightboxCopyLink = (image: any) => {
-  const url = image.image_url || image.cdn_url
+  const url = image.share_url || image.image_url || image.cdn_url
   if (url) {
     navigator.clipboard.writeText(url).then(() => {
       notification.success('已复制', '图片链接已复制到剪贴板')
