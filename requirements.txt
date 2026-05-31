@@ -15,3 +15,6 @@ requests==2.32.4
 # 其他依赖
 python-dotenv==1.0.0
 waitress==3.0.0
+
+# 加密
+cryptography==44.0.0
