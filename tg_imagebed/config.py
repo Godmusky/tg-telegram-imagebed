@@ -38,14 +38,19 @@ DATABASE_PATH = os.path.join(DATA_DIR, "telegram_imagebed.db")
 LOG_FILE = os.path.join(DATA_DIR, "telegram_imagebed.log")
 
 # ===================== 服务器配置（硬编码） =====================
-PORT = 18793
+PORT = int(os.environ.get('PORT', 18793))
 HOST = '0.0.0.0'
 ALLOWED_ORIGINS = os.environ.get('ALLOWED_ORIGINS', '*').strip() or '*'
 SESSION_LIFETIME = 3600
 REMEMBER_ME_LIFETIME = 30 * 24 * 3600
 
 # ===================== 版本 & 启动时间 =====================
-STATIC_VERSION = str(int(time.time()))
+# 读取 VERSION 文件作为版本号，不存在时回退到时间戳
+_version_file = BASE_DIR / "VERSION"
+if _version_file.exists():
+    STATIC_VERSION = _version_file.read_text(encoding='utf-8').strip()
+else:
+    STATIC_VERSION = str(int(time.time()))
 START_TIME = time.time()
 
 # ===================== 代理（标准系统环境变量，非 .env） =====================

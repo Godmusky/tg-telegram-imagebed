@@ -33,7 +33,7 @@ services:
         max-size: 10m
         max-file: "3"
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:18793/api/health"]
+      test: ["CMD", "curl", "--noproxy", "localhost", "-f", "http://localhost:18793/api/health"]
       interval: 30s
       timeout: 10s
       retries: 3

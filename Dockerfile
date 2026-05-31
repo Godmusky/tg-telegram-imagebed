@@ -48,7 +48,7 @@ COPY --from=frontend-builder /frontend/.output/public /app/frontend/.output/publ
 EXPOSE 18793
 
 # 健康检查
-HEALTHCHECK --interval=30s --timeout=10s --start-period=15s --retries=3 CMD curl -f http://localhost:18793/api/health || exit 1
+HEALTHCHECK --interval=30s --timeout=10s --start-period=15s --retries=3 CMD curl --noproxy localhost -f http://localhost:18793/api/health || exit 1
 
 # 设置环境变量
 ENV PYTHONUNBUFFERED=1

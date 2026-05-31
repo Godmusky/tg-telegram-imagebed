@@ -8,6 +8,7 @@ Telegram 消息处理器模块
 import asyncio
 import os
 import re
+import tempfile
 import time
 from html import escape as html_escape
 from typing import Any, Dict, List, Optional, Tuple
@@ -355,37 +356,49 @@ async def handle_photo(update: Update, context):
             return
 
         file_info = await asyncio.wait_for(context.bot.get_file(tg_file.file_id), timeout=_DOWNLOAD_TIMEOUT)
-        file_bytes = await asyncio.wait_for(file_info.download_as_bytearray(), timeout=_DOWNLOAD_TIMEOUT)
+        # 下载到临时文件，避免大文件 OOM
+        fd, temp_dl_path = tempfile.mkstemp(suffix='.tmp', prefix='tg_download_')
+        os.close(fd)
+        try:
+            await asyncio.wait_for(file_info.download_to_drive(temp_dl_path), timeout=_DOWNLOAD_TIMEOUT)
 
-        if is_group:
-            result = record_existing_telegram_file(
-                file_id=tg_file.file_id,
-                file_unique_id=file_unique_id,
-                file_path=getattr(file_info, 'file_path', '') or '',
-                file_content=bytes(file_bytes),
-                filename=filename,
-                content_type=content_type,
-                username=username,
-                tg_user_id=tg_user_id,
-                source='telegram_group',
-                auth_token=upload_auth_token,
-                is_group_upload=True,
-                group_message_id=message.message_id,
-                group_chat_id=chat.id,
-            )
-        else:
-            result = process_upload(
-                file_content=bytes(file_bytes),
-                filename=filename,
-                content_type=content_type,
-                username=username,
-                tg_user_id=tg_user_id,
-                source='telegram_bot',
-                auth_token=upload_auth_token,
-                is_group_upload=False,
-                group_message_id=None,
-                upload_scene=None
-            )
+            if is_group:
+                result = await asyncio.to_thread(
+                    record_existing_telegram_file,
+                    file_id=tg_file.file_id,
+                    file_unique_id=file_unique_id,
+                    file_path=getattr(file_info, 'file_path', '') or '',
+                    temp_file_path=temp_dl_path,
+                    filename=filename,
+                    content_type=content_type,
+                    username=username,
+                    tg_user_id=tg_user_id,
+                    source='telegram_group',
+                    auth_token=upload_auth_token,
+                    is_group_upload=True,
+                    group_message_id=message.message_id,
+                    group_chat_id=chat.id,
+                )
+            else:
+                result = await asyncio.to_thread(
+                    process_upload,
+                    file_path=temp_dl_path,
+                    filename=filename,
+                    content_type=content_type,
+                    username=username,
+                    tg_user_id=tg_user_id,
+                    source='telegram_bot',
+                    auth_token=upload_auth_token,
+                    is_group_upload=False,
+                    group_message_id=None,
+                    upload_scene=None,
+                )
+        finally:
+            # 清理临时下载文件
+            try:
+                os.unlink(temp_dl_path)
+            except OSError:
+                pass
 
         if not reply_enabled:
             return

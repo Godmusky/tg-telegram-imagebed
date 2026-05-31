@@ -92,12 +92,7 @@ def _security_event_meta(event_type: str) -> Dict[str, str]:
 
 
 def _load_security_activities() -> List[Dict[str, Any]]:
-    with get_connection() as conn:
-        cursor = conn.cursor()
-        cursor.execute("SELECT value FROM admin_config WHERE key = 'security_log'")
-        row = cursor.fetchone()
-
-    logs = json.loads(row[0]) if row and row[0] else []
+    logs = admin_module._read_security_log()
     activities: List[Dict[str, Any]] = []
 
     # 数据库存储是追加顺序，这里反转为最新优先

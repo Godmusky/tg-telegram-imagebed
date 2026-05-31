@@ -266,6 +266,8 @@ DEFAULT_SYSTEM_SETTINGS = {
 def init_system_settings() -> None:
     """初始化系统设置（在 admin_config 表中），仅插入默认值"""
     try:
+        from ..crypto_utils import encrypt_value
+
         with get_connection() as conn:
             cursor = conn.cursor()
             for key, default_value in DEFAULT_SYSTEM_SETTINGS.items():
@@ -275,9 +277,14 @@ def init_system_settings() -> None:
                 existing = cursor.fetchone()
 
                 if not existing:
+                    # 敏感字段加密存储
+                    stored_value = default_value
+                    if key in SENSITIVE_SETTINGS and default_value:
+                        stored_value = encrypt_value(default_value)
+
                     cursor.execute(
                         'INSERT INTO admin_config (key, value) VALUES (?, ?)',
-                        (key, default_value)
+                        (key, stored_value)
                     )
 
                     if key in SENSITIVE_SETTINGS:
@@ -296,7 +303,12 @@ def get_system_setting(key: str) -> Optional[str]:
             cursor.execute('SELECT value FROM admin_config WHERE key = ?', (key,))
             row = cursor.fetchone()
             if row:
-                return row[0]
+                value = row[0]
+                # 敏感字段自动解密
+                if key in SENSITIVE_SETTINGS and value:
+                    from ..crypto_utils import decrypt_value
+                    return decrypt_value(value)
+                return value
             return DEFAULT_SYSTEM_SETTINGS.get(key)
     except Exception as e:
         logger.error(f"获取系统设置失败 {key}: {e}")
@@ -310,11 +322,18 @@ def get_all_system_settings() -> Dict[str, Any]:
             cursor = conn.cursor()
             settings = dict(DEFAULT_SYSTEM_SETTINGS)  # 从默认值开始
 
+            from ..crypto_utils import decrypt_value
+
             for key in DEFAULT_SYSTEM_SETTINGS.keys():
                 cursor.execute('SELECT value FROM admin_config WHERE key = ?', (key,))
                 row = cursor.fetchone()
                 if row:
-                    settings[key] = row[0]
+                    value = row[0]
+                    # 敏感字段自动解密
+                    if key in SENSITIVE_SETTINGS and value:
+                        settings[key] = decrypt_value(value)
+                    else:
+                        settings[key] = value
 
             return settings
     except Exception as e:
@@ -329,12 +348,18 @@ def update_system_setting(key: str, value: str) -> bool:
         return False
 
     try:
+        # 敏感字段自动加密
+        stored_value = value
+        if key in SENSITIVE_SETTINGS and value:
+            from ..crypto_utils import encrypt_value
+            stored_value = encrypt_value(value)
+
         with get_connection() as conn:
             cursor = conn.cursor()
             cursor.execute('''
                 INSERT OR REPLACE INTO admin_config (key, value, updated_at)
                 VALUES (?, ?, CURRENT_TIMESTAMP)
-            ''', (key, value))
+            ''', (key, stored_value))
             if key in SENSITIVE_SETTINGS:
                 logger.info(f"更新系统设置: {key}=[REDACTED]")
             else:
@@ -365,14 +390,21 @@ def update_system_setting(key: str, value: str) -> bool:
 def update_system_settings(settings: Dict[str, str]) -> bool:
     """批量更新系统设置"""
     try:
+        from ..crypto_utils import encrypt_value
+
         with get_connection() as conn:
             cursor = conn.cursor()
             for key, value in settings.items():
                 if key in DEFAULT_SYSTEM_SETTINGS:
+                    # 敏感字段自动加密
+                    stored_value = value
+                    if key in SENSITIVE_SETTINGS and value:
+                        stored_value = encrypt_value(value)
+
                     cursor.execute('''
                         INSERT OR REPLACE INTO admin_config (key, value, updated_at)
                         VALUES (?, ?, CURRENT_TIMESTAMP)
-                    ''', (key, value))
+                    ''', (key, stored_value))
                     if key in SENSITIVE_SETTINGS:
                         logger.info(f"更新系统设置: {key}=[REDACTED]")
                     else:

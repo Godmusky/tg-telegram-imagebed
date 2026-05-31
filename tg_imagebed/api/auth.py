@@ -3,6 +3,7 @@
 """
 认证路由模块 - Token 认证 API
 """
+import os
 import time
 import requests as http_requests
 from datetime import datetime
@@ -233,14 +234,14 @@ def upload_with_token():
     if file.filename == '':
         return add_cache_headers(jsonify({'success': False, 'error': '未选择文件'}), 'no-cache'), 400
 
-    # 公共文件校验（扩展名、Content-Type、大小、魔数）
-    err, file_content = validate_upload_file(file)
+    # 公共文件校验（扩展名、Content-Type、大小、魔数）— 返回临时文件路径
+    err, temp_path = validate_upload_file(file)
     if err:
         return err
 
     try:
         result = process_upload(
-            file_content=file_content,
+            file_path=temp_path,
             filename=file.filename,
             content_type=file.content_type,
             username='guest_user',
@@ -277,6 +278,13 @@ def upload_with_token():
     except Exception as e:
         logger.error(f"Token上传错误: {e}")
         return add_cache_headers(jsonify({'success': False, 'error': '上传失败，请稍后重试'}), 'no-cache'), 500
+    finally:
+        # 清理临时文件
+        if temp_path:
+            try:
+                os.unlink(temp_path)
+            except OSError:
+                pass
 
 @auth_bp.route('/api/auth/uploads', methods=['GET'])
 def get_token_uploads_api():

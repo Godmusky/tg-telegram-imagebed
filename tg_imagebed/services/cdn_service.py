@@ -363,7 +363,7 @@ def _cdn_cache_monitor_worker():
     while _cdn_monitor_running:
         try:
             try:
-                run_at, _seq, task = cdn_monitor_queue.get(timeout=1)
+                run_at, _seq, task = cdn_monitor_queue.get(timeout=30)
             except queue.Empty:
                 continue
 
@@ -376,7 +376,7 @@ def _cdn_cache_monitor_worker():
                 wait_time = min(run_at - now, 1.0)
                 _cdn_monitor_stop_event.wait(timeout=wait_time)
                 try:
-                    cdn_monitor_queue.put((run_at, next(_cdn_monitor_seq), task), block=True, timeout=0.5)
+                    cdn_monitor_queue.put((run_at, next(_cdn_monitor_seq), task), block=True, timeout=30)
                 except queue.Full:
                     logger.warning(f'CDN监控队列已满，丢弃延迟任务 {task.get("encrypted_id")}')
                 continue
@@ -437,7 +437,7 @@ def _schedule_cdn_task(encrypted_id: str, run_at: float, task: dict) -> bool:
     with _cdn_schedule_lock:
         _cdn_schedule_map[encrypted_id] = token
     try:
-        cdn_monitor_queue.put((run_at, next(_cdn_monitor_seq), task), block=True, timeout=1.0)
+        cdn_monitor_queue.put((run_at, next(_cdn_monitor_seq), task), block=True, timeout=30)
         return True
     except queue.Full:
         with _cdn_schedule_lock:

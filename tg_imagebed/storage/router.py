@@ -305,13 +305,15 @@ def get_storage_router(*, ttl_seconds: int = 5) -> StorageRouter:
         StorageRouter 实例
     """
     global _router, _router_ts
-    now = time.time()
-    # 快速路径：缓存有效时直接返回（无锁读取）
-    if _router and (now - _router_ts) < ttl_seconds:
-        return _router
+    # 快速路径：缓存有效时直接返回（持锁读取，消除 data race）
     with _router_lock:
-        # 双重检查：进入锁后再次验证，避免重复创建
         now = time.time()
+        if _router and (now - _router_ts) < ttl_seconds:
+            return _router
+    # 快速路径未命中，进入慢路径（持锁创建）
+    with _router_lock:
+        now = time.time()
+        # 双重检查：进入锁后再次验证，避免重复创建
         if _router and (now - _router_ts) < ttl_seconds:
             return _router
         cfg = _load_storage_config()

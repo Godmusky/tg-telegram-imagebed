@@ -5,14 +5,17 @@
 """
 from __future__ import annotations
 
+import os
+import tempfile
 import time
 from flask import request, jsonify
 
 from . import upload_bp
 from ..config import logger
-from ..utils import add_cache_headers, format_size, get_image_domain
+from ..utils import add_cache_headers, format_size, get_image_domain, get_client_ip
 from ..services.file_service import process_upload
-from ..database import is_guest_upload_allowed, get_system_setting_int, get_upload_count_today
+from ..database import is_guest_upload_allowed, get_system_setting_int
+from ..rate_limiter import check_daily_upload_limit
 
 # 图片魔数签名
 IMAGE_SIGNATURES = {
@@ -72,7 +75,8 @@ def is_extension_allowed(filename: str) -> bool:
 def validate_upload_file(file) -> tuple:
     """
     公共文件上传校验（扩展名、Content-Type、大小、魔数）
-    返回 (error_response, file_content) — error_response 为 None 表示校验通过
+    返回 (error_response, temp_file_path) — error_response 为 None 表示校验通过
+    文件被流式保存到临时文件，校验通过时返回临时文件路径（调用方负责清理）
     """
     content_type = (file.content_type or '').strip().lower()
 
@@ -96,16 +100,17 @@ def validate_upload_file(file) -> tuple:
     if file_size > max_size_bytes:
         return (add_cache_headers(jsonify({'success': False, 'error': f'文件大小超过 {max_size_mb}MB 限制'}), 'no-cache'), 400), None
 
-    file_content = file.read()
-
-    # 魔数校验：验证文件实际类型
-    detected_mime = validate_image_magic(file_content)
-    if not detected_mime:
-        return (add_cache_headers(jsonify({'success': False, 'error': '无效的图片文件格式'}), 'no-cache'), 400), None
-
-    # 拒绝 0 字节文件（魔数校验可能通过极小内容但实际无有效图片数据）
+    # 拒绝 0 字节文件（先于魔数校验，避免极小内容绕过）
     if file_size == 0:
         return (add_cache_headers(jsonify({'success': False, 'error': '不允许上传空文件'}), 'no-cache'), 400), None
+
+    # 只读前 32 字节校验魔数（不加载完整文件到内存）
+    header = file.read(32)
+    file.seek(0)  # 复位，供后续 stream save 使用
+
+    detected_mime = validate_image_magic(header)
+    if not detected_mime:
+        return (add_cache_headers(jsonify({'success': False, 'error': '无效的图片文件格式'}), 'no-cache'), 400), None
 
     # 对无扩展名文件，用魔数反查扩展名是否在允许列表（防御绕过）
     if not file.filename or '.' not in (file.filename or ''):
@@ -115,7 +120,12 @@ def validate_upload_file(file) -> tuple:
             return (add_cache_headers(jsonify(
                 {'success': False, 'error': f'不支持的文件格式: .{detected_ext}'}), 'no-cache'), 400), None
 
-    return None, file_content
+    # 流式保存到临时文件（避免大文件 OOM）
+    fd, temp_path = tempfile.mkstemp(suffix='.tmp', prefix='upload_')
+    os.close(fd)
+    file.save(temp_path)
+
+    return None, temp_path
 
 
 @upload_bp.route('/api/upload', methods=['POST'])
@@ -137,22 +147,24 @@ def upload_file():
     if file.filename == '':
         return add_cache_headers(jsonify({'success': False, 'error': 'No file selected'}), 'no-cache'), 400
 
-    # 检查每日上传限制（匿名上传按来源全局限制）
+    # 检查每日上传限制（按客户端 IP 独立限额）
     daily_limit = get_system_setting_int('daily_upload_limit', 0, minimum=0, maximum=1000000)
     if daily_limit > 0:
-        uploaded_today = get_upload_count_today(source='web_upload')
-        if uploaded_today >= daily_limit:
-            return add_cache_headers(jsonify({'success': False, 'error': f'已达到每日上传限制({daily_limit}张)'}), 'no-cache'), 429
+        client_ip = get_client_ip(request)
+        if not check_daily_upload_limit(client_ip, daily_limit):
+            return add_cache_headers(jsonify(
+                {'success': False, 'error': f'该 IP 已达到每日上传限制({daily_limit}张)，请明天再试'}
+            ), 'no-cache'), 429
 
-    # 公共文件校验（扩展名、Content-Type、大小、魔数）
-    err, file_content = validate_upload_file(file)
+    # 公共文件校验（扩展名、Content-Type、大小、魔数）— 返回临时文件路径
+    err, temp_path = validate_upload_file(file)
     if err:
         return err
 
     try:
-        # 处理上传
+        # 处理上传（通过 file_path 传递，避免全量加载到内存）
         result = process_upload(
-            file_content=file_content,
+            file_path=temp_path,
             filename=file.filename,
             content_type=file.content_type,
             username='web_user',
@@ -181,3 +193,10 @@ def upload_file():
     except Exception as e:
         logger.error(f"Upload error: {e}")
         return add_cache_headers(jsonify({'success': False, 'error': '上传失败，请稍后重试'}), 'no-cache'), 500
+    finally:
+        # 清理临时文件
+        if temp_path:
+            try:
+                os.unlink(temp_path)
+            except OSError:
+                pass

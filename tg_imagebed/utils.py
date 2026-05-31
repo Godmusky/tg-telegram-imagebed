@@ -37,12 +37,35 @@ _lock_fd = None
 
 
 def acquire_lock() -> bool:
-    """获取锁以确保只有一个实例在运行（支持 Windows 和 Linux）"""
+    """获取锁以确保只有一个实例在运行（支持 Windows 和 Linux）
+
+    写入 PID 到锁文件，再次获取时检测旧 PID 是否存活，
+    若旧进程已死则清理残留锁文件后继续。
+    """
     global _lock_file_handle, _lock_fd
     try:
+        # 先检查是否有残留锁文件（旧进程已死）
+        if os.path.exists(LOCK_FILE):
+            try:
+                with open(LOCK_FILE, 'r') as f:
+                    old_pid_str = f.read().strip()
+                if old_pid_str.isdigit():
+                    old_pid = int(old_pid_str)
+                    if not _is_pid_alive(old_pid):
+                        logger.warning(f"清理残留锁文件（PID {old_pid} 已不存在）")
+                        os.remove(LOCK_FILE)
+            except (OSError, ValueError):
+                # 锁文件损坏或无法读取，直接删除
+                try:
+                    os.remove(LOCK_FILE)
+                except OSError:
+                    pass
+
         if sys.platform == 'win32':
             import msvcrt
             _lock_file_handle = open(LOCK_FILE, 'w')
+            _lock_file_handle.write(str(os.getpid()))
+            _lock_file_handle.flush()
             try:
                 msvcrt.locking(_lock_file_handle.fileno(), msvcrt.LK_NBLCK, 1)
                 return True
@@ -52,6 +75,8 @@ def acquire_lock() -> bool:
         else:
             import fcntl
             _lock_fd = open(LOCK_FILE, 'w')
+            _lock_fd.write(str(os.getpid()))
+            _lock_fd.flush()
             try:
                 fcntl.lockf(_lock_fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
                 return True
@@ -60,6 +85,15 @@ def acquire_lock() -> bool:
                 return False
     except Exception as e:
         logger.error(f"获取锁失败: {e}")
+        return False
+
+
+def _is_pid_alive(pid: int) -> bool:
+    """检测指定 PID 的进程是否存活"""
+    try:
+        os.kill(pid, 0)
+        return True
+    except OSError:
         return False
 
 

@@ -67,8 +67,12 @@ def get_image(encrypted_id):
             from ..database import is_allowed_image_domain
             if not is_allowed_image_domain(request):
                 return jsonify({'success': False, 'error': 'Domain not allowed'}), 403
-        except Exception:
-            pass
+        except ImportError as e:
+            logger.warning(f"域名验证模块导入失败，默认拒绝访问: {e}")
+            return jsonify({'success': False, 'error': 'Domain not allowed'}), 403
+        except (AttributeError, KeyError, TypeError, ValueError) as e:
+            logger.warning(f"域名验证参数异常，默认拒绝访问: {e}")
+            return jsonify({'success': False, 'error': 'Domain not allowed'}), 403
 
         # CDN 重定向模式
         cdn_domain, _, cdn_mode = _get_domain_mode()
@@ -147,7 +151,9 @@ def get_image(encrypted_id):
         # 转发后端返回的 Content-Range（206 Partial Content 必须）
         if 'Content-Range' in dl.headers:
             response.headers['Content-Range'] = dl.headers['Content-Range']
-        response.headers['Content-Disposition'] = f'inline; filename="{original_filename}"'
+        # RFC 5987 编码文件名，防止头部注入（\r\n 等控制字符）
+        encoded_filename = urllib.parse.quote(original_filename, safe='')
+        response.headers['Content-Disposition'] = f"inline; filename*=UTF-8''{encoded_filename}"
         return add_cache_headers(response, cache_policy, cache_seconds)
 
     except Exception as e:

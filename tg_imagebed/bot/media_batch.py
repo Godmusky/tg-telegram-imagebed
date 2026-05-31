@@ -5,6 +5,8 @@
 
 处理群组/频道中的批量图片上传，使用 debounce 机制合并汇总消息。
 """
+import os
+import tempfile
 import time
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional, Tuple
@@ -151,23 +153,34 @@ async def _flush_media_group(
                 continue
 
             file_info = await asyncio.wait_for(bot.get_file(file_id), timeout=_DOWNLOAD_TIMEOUT)
-            file_bytes = await asyncio.wait_for(file_info.download_as_bytearray(), timeout=_DOWNLOAD_TIMEOUT)
+            # 下载到临时文件，避免大文件 OOM
+            fd, temp_dl_path = tempfile.mkstemp(suffix='.tmp', prefix='batch_download_')
+            os.close(fd)
+            try:
+                await asyncio.wait_for(file_info.download_to_drive(temp_dl_path), timeout=_DOWNLOAD_TIMEOUT)
 
-            result = record_existing_telegram_file(
-                file_id=file_id,
-                file_unique_id=item.get("file_unique_id"),
-                file_path=getattr(file_info, "file_path", "") or "",
-                file_content=bytes(file_bytes),
-                filename=item.get("filename", ""),
-                content_type=item.get("content_type", "image/jpeg"),
-                username=item.get("username", ""),
-                tg_user_id=item.get("tg_user_id"),
-                source="telegram_group",
-                auth_token=item.get("auth_token"),
-                is_group_upload=True,
-                group_message_id=item.get("message_id"),
-                group_chat_id=batch.chat_id,
-            )
+                result = await asyncio.to_thread(
+                    record_existing_telegram_file,
+                    file_id=file_id,
+                    file_unique_id=item.get("file_unique_id"),
+                    file_path=getattr(file_info, "file_path", "") or "",
+                    temp_file_path=temp_dl_path,
+                    filename=item.get("filename", ""),
+                    content_type=item.get("content_type", "image/jpeg"),
+                    username=item.get("username", ""),
+                    tg_user_id=item.get("tg_user_id"),
+                    source="telegram_group",
+                    auth_token=item.get("auth_token"),
+                    is_group_upload=True,
+                    group_message_id=item.get("message_id"),
+                    group_chat_id=batch.chat_id,
+                )
+            finally:
+                # 清理临时下载文件
+                try:
+                    os.unlink(temp_dl_path)
+                except OSError:
+                    pass
 
             if not result:
                 failure_count += 1

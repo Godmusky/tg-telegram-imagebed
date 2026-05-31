@@ -95,7 +95,10 @@ try:
         LOGIN_LOCKOUT_DURATIONS,
         LOGIN_ATTEMPT_WINDOW,
         MAX_CONCURRENT_SESSIONS,
+        logger as _config_logger,
     )
+    # 统一使用 config 模块的 logger，替换模块级 logger
+    logger = _config_logger
 except ImportError:
     # 兼容独立运行场景
     SESSION_LIFETIME = 3600
@@ -362,43 +365,79 @@ def validate_password_strength(password: str) -> tuple[bool, str]:
     """
     校验密码强度
     返回: (valid, message)
+
+    要求: ≥12 字符、含大小写字母、含数字、含特殊字符
     """
-    if not password or len(password) < 8:
-        return False, '密码长度至少需要8个字符'
-    if not re.search(r'[a-zA-Z]', password):
-        return False, '密码必须包含字母'
+    if not password or len(password) < 12:
+        return False, '密码长度至少需要12个字符'
+    if not re.search(r'[a-z]', password):
+        return False, '密码必须包含小写字母'
+    if not re.search(r'[A-Z]', password):
+        return False, '密码必须包含大写字母'
     if not re.search(r'[0-9]', password):
         return False, '密码必须包含数字'
+    if not re.search(r'[^a-zA-Z0-9]', password):
+        return False, '密码必须包含特殊字符（如 !@#$% 等）'
     return True, ''
 
 
 # ===================== 安全审计日志 =====================
+def _read_security_log() -> list:
+    """读取安全日志，兼容旧 JSON 数组格式和新 JSONL 格式"""
+    with get_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT value FROM admin_config WHERE key = 'security_log'")
+        row = cursor.fetchone()
+
+    if not row or not row[0]:
+        return []
+
+    raw = row[0].strip()
+    if raw.startswith('['):
+        # 旧格式：JSON 数组（迁移后自动转为 JSONL）
+        return json.loads(raw)
+    else:
+        # 新格式：JSONL，每行一个事件
+        return [json.loads(line) for line in raw.split('\n') if line.strip()]
+
+
 def _log_security_event(event_type: str, ip: str, username: str = '', detail: str = '') -> None:
-    """将安全事件写入 admin_config 表（key=security_log，保留最近 200 条）"""
+    """将安全事件以 JSONL 格式追加写入 admin_config（key=security_log，保留最近 200 条）
+
+    使用 append-only JSONL 避免 O(n²) I/O 放大：
+    - 旧方案：读全量 JSON → 解析 → 追加 → 序列化 → 写回（O(n) 读写量）
+    - 新方案：读原始文本 → 截取末尾 199 行 → 追加 1 行 → 写回（O(1) 读写量）
+    """
     try:
+        entry = json.dumps({
+            'type': event_type,
+            'ip': ip,
+            'username': username,
+            'detail': detail,
+            'time': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+        }, ensure_ascii=False)
+
         with get_connection() as conn:
             cursor = conn.cursor()
-
-            # 读取现有日志
             cursor.execute("SELECT value FROM admin_config WHERE key = 'security_log'")
             row = cursor.fetchone()
-            logs = json.loads(row[0]) if row else []
 
-            # 追加新事件
-            logs.append({
-                'type': event_type,
-                'ip': ip,
-                'username': username,
-                'detail': detail,
-                'time': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
-            })
-
-            # 保留最近 200 条
-            logs = logs[-200:]
+            if row and row[0]:
+                raw = row[0].strip()
+                if raw.startswith('['):
+                    # 旧格式迁移：解析旧数组，转为 JSONL
+                    old_logs = json.loads(raw)
+                    lines = [json.dumps(e, ensure_ascii=False) for e in old_logs[-199:]]
+                else:
+                    lines = raw.split('\n')[-199:] if raw else []
+                lines.append(entry)
+                new_value = '\n'.join(lines)
+            else:
+                new_value = entry
 
             cursor.execute(
                 "INSERT OR REPLACE INTO admin_config (key, value, updated_at) VALUES (?, ?, CURRENT_TIMESTAMP)",
-                ('security_log', json.dumps(logs, ensure_ascii=False))
+                ('security_log', new_value)
             )
     except sqlite3.Error as e:
         logger.debug(f"写入安全审计日志失败: {e}")
@@ -777,7 +816,6 @@ def verify_admin_password(username: str, password: str) -> bool:
             return check_password_hash(hash_value, password)
         else:
             # 兼容旧格式（sha256）
-            import hashlib
             if hash_value == hashlib.sha256(password.encode()).hexdigest():
                 # 旧格式验证成功，自动升级为 pbkdf2
                 try:

@@ -3,6 +3,7 @@
 """数据库连接管理 + 初始化"""
 import os
 import sqlite3
+import threading
 import time
 import random
 import json
@@ -21,29 +22,64 @@ def _get_db_path() -> str:
 
 
 # ===================== 数据库连接管理 =====================
-@contextmanager
-def get_connection():
-    """获取数据库连接的上下文管理器"""
-    conn = sqlite3.connect(_get_db_path())
+
+# 线程级连接池：每个线程复用一个长连接，避免每次请求都
+# create-connect-pragma-chmod-close 的开销
+_local = threading.local()
+
+
+def _create_connection() -> sqlite3.Connection:
+    """创建并配置一个新的 SQLite 连接（仅首次调用时执行）。"""
+    db_path = _get_db_path()
+    conn = sqlite3.connect(db_path)
+
     # 确保数据库文件权限为 600（仅所有者可读写）
-    _db_path = _get_db_path()
-    if os.path.exists(_db_path):
+    if os.path.exists(db_path):
         try:
-            os.chmod(_db_path, 0o600)
+            os.chmod(db_path, 0o600)
         except OSError:
             pass
+
     conn.row_factory = sqlite3.Row
     conn.execute('PRAGMA foreign_keys = ON')
     conn.execute('PRAGMA busy_timeout = 5000')
     conn.execute('PRAGMA journal_mode=WAL')
+    return conn
+
+
+@contextmanager
+def get_connection():
+    """获取数据库连接的上下文管理器（线程级连接池）。
+
+    每个线程持有自己的长连接，首次调用时创建并配置，后续调用
+    复用同一连接。连接在上下文退出时提交/回滚但不关闭，
+    避免每次请求的连接创建和 WAL pragma 开销。
+
+    支持运行时 DATABASE_PATH 切换（测试场景）：
+    当路径变化时自动关闭旧连接并创建新连接。
+    """
+    current_path = _get_db_path()
+    conn = getattr(_local, 'conn', None)
+    cached_path = getattr(_local, 'db_path', None)
+
+    if conn is None or cached_path != current_path:
+        # 路径变更：关闭旧连接
+        if conn is not None:
+            try:
+                conn.close()
+            except Exception:
+                pass
+        conn = _create_connection()
+        _local.conn = conn
+        _local.db_path = current_path
+
     try:
         yield conn
         conn.commit()
     except Exception:
         conn.rollback()
         raise
-    finally:
-        conn.close()
+    # 不关闭连接——线程级复用
 
 
 def db_retry(max_attempts: int = 3, base_delay: float = 0.1, max_delay: float = 2.0):

@@ -116,6 +116,75 @@ class SimpleRateLimiter:
             return len(self._requests)
 
 
+# ── DailyUploadLimiter ──────────────────────────────────────────────
+
+class DailyUploadLimiter:
+    """每天按 key（IP 地址）限制上传次数的内存计数器。
+
+    与 SimpleRateLimiter（每分钟请求速率）互补：
+      - SimpleRateLimiter   → 短窗口速率限制（默认 10 次/分钟/IP）
+      - DailyUploadLimiter  → 24 小时配额限制（按配置的 daily_upload_limit）
+
+    以自然日（凌晨 0:00 重置）为窗口，非滚动 24 小时。
+    线程安全（threading.Lock），LRU 淘汰防内存泄漏。
+    """
+
+    _MAX_ENTRIES = 50000  # 追踪的最大 IP 数量
+
+    def __init__(self) -> None:
+        self._counts: dict[str, int] = {}
+        self._current_date: str = ''  # 'YYYY-MM-DD'
+        self._lock = threading.Lock()
+
+    def _ensure_date(self) -> str:
+        """确保计数器日期与当前自然日同步。日期变更时全局清零。"""
+        today = time.strftime('%Y-%m-%d', time.localtime())
+        with self._lock:
+            if today != self._current_date:
+                self._counts.clear()
+                self._current_date = today
+        return today
+
+    def check_and_increment(self, key: str, limit: int) -> bool:
+        """检查 key 的下一次上传是否在配额内。是→计数+1 并返回 True，否→返回 False。
+
+        key 通常是客户端 IP（通过 get_client_ip 获取）。
+        limit <= 0 时视为不限制，始终返回 True 且不计数。
+        """
+        if limit <= 0:
+            return True
+
+        self._ensure_date()
+
+        with self._lock:
+            count = self._counts.get(key, 0)
+
+            if count >= limit:
+                return False
+
+            self._counts[key] = count + 1
+
+            # LRU 淘汰：超出最大追踪条目时删除最旧 key
+            # （使用 insertion-order 保留的 dict 特性 — Python 3.7+）
+            while len(self._counts) > self._MAX_ENTRIES:
+                oldest_key = next(iter(self._counts))
+                del self._counts[oldest_key]
+
+            return True
+
+    @property
+    def tracked_entries(self) -> int:
+        """当前追踪的 key 数量（调试用）。"""
+        with self._lock:
+            return len(self._counts)
+
+    def get_count(self, key: str) -> int:
+        """获取 key 的今日上传次数（不递增）。"""
+        self._ensure_date()
+        with self._lock:
+            return self._counts.get(key, 0)
+
+
 # ── 速率限制器实例 ─────────────────────────────────────────────────
 
 _image_limiter = SimpleRateLimiter(
@@ -134,6 +203,9 @@ _LIMITERS: dict[str, SimpleRateLimiter] = {
     'upload': _upload_limiter,
     'api': _api_limiter,
 }
+
+# 每日上传配额限制器（按 IP 隔离，在 upload.py 中使用）
+_daily_upload_limiter = DailyUploadLimiter()
 
 # 不施加速率限制的路径前缀
 _EXEMPT_PREFIXES = (
@@ -204,3 +276,12 @@ def check_rate_limit() -> tuple | None:
         return response, 429
 
     return None
+
+
+def check_daily_upload_limit(ip: str, limit: int) -> bool:
+    """检查指定 IP 的每日上传配额。
+
+    limit <= 0 时视为不限制，始终返回 True。
+    返回 True 表示未超限（允许上传），False 表示已达上限（应返回 429）。
+    """
+    return _daily_upload_limiter.check_and_increment(ip, limit)

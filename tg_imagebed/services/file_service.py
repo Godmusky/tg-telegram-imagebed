@@ -5,6 +5,7 @@
 
 提供文件上传到 Telegram、获取文件路径等功能。
 """
+import os
 import time
 import hashlib
 from typing import Optional, Dict, Any
@@ -55,10 +56,29 @@ def get_fresh_file_path(file_id: str) -> Optional[str]:
         return None
 
 
+def _compute_file_hash(file_path: str) -> str:
+    """流式计算文件 SHA256 哈希（逐块读取，不占用大量内存）"""
+    sha = hashlib.sha256()
+    with open(file_path, 'rb') as f:
+        while True:
+            chunk = f.read(8192)
+            if not chunk:
+                break
+            sha.update(chunk)
+    return sha.hexdigest()
+
+
+def _read_file_bytes(file_path: str) -> bytes:
+    """从文件路径读取完整内容（仅在需要时加载到内存）"""
+    with open(file_path, 'rb') as f:
+        return f.read()
+
+
 def process_upload(
-    file_content: bytes,
-    filename: str,
-    content_type: str,
+    file_content: Optional[bytes] = None,
+    file_path: Optional[str] = None,
+    filename: str = '',
+    content_type: str = '',
     username: str = 'web_user',
     tg_user_id: Optional[int] = None,
     source: str = 'web_upload',
@@ -72,7 +92,8 @@ def process_upload(
     处理文件上传的完整流程
 
     Args:
-        file_content: 文件内容
+        file_content: 文件内容（bytes）。与 file_path 二选一；file_path 优先
+        file_path: 临时文件路径。提供时使用流式 hash + 按需读取，避免大文件 OOM
         filename: 文件名
         content_type: MIME 类型
         username: 用户名
@@ -87,7 +108,17 @@ def process_upload(
     Returns:
         包含 encrypted_id, url 等信息的字典，失败返回 None
     """
-    file_size = len(file_content)
+    # 优先使用 file_path（流式），否则使用 file_content（兼容旧调用）
+    if file_path:
+        file_size = os.path.getsize(file_path)
+        file_hash = _compute_file_hash(file_path)
+        file_content = _read_file_bytes(file_path)
+    elif file_content is not None:
+        file_size = len(file_content)
+        file_hash = hashlib.sha256(file_content).hexdigest()
+    else:
+        logger.error("process_upload: 必须提供 file_content 或 file_path")
+        return None
 
     # 规范化 content_type（防止 None 或空字符串导致后端出错）
     if not content_type:
@@ -102,9 +133,6 @@ def process_upload(
             scene = "token"
         else:
             scene = "guest"
-
-    # 计算文件哈希（使用 SHA256，比 MD5 更安全）
-    file_hash = hashlib.sha256(file_content).hexdigest()
 
     # 构建说明
     caption = f"{source} | 文件名: {filename} | 大小: {file_size} bytes | 时间: {time.strftime('%Y-%m-%d %H:%M:%S')}"
@@ -191,7 +219,8 @@ def record_existing_telegram_file(
     *,
     file_id: str,
     file_path: str,
-    file_content: bytes,
+    file_content: Optional[bytes] = None,
+    temp_file_path: Optional[str] = None,
     filename: str,
     content_type: str,
     username: str = 'web_user',
@@ -208,17 +237,31 @@ def record_existing_telegram_file(
 
     适用于群组监听场景：用户在群里发送图片后，bot 通过 getFile 拿到 file_path，
     同时下载字节用于计算 file_hash（去重/审计），但不再把图片转存到存储频道。
+
+    Args:
+        file_id: Telegram 文件 ID
+        file_path: Telegram 服务端文件路径
+        file_content: 文件内容（bytes）。与 temp_file_path 二选一；temp_file_path 优先
+        temp_file_path: 本地临时文件路径。提供时使用流式 hash 避免大文件 OOM
     """
     if not file_id:
         return None
 
     file_path = file_path or ''
-    file_size = len(file_content or b'')
+
+    # 优先使用 temp_file_path（流式），否则使用 file_content（兼容旧调用）
+    if temp_file_path:
+        file_size = os.path.getsize(temp_file_path)
+        file_hash = _compute_file_hash(temp_file_path)
+    elif file_content is not None:
+        file_size = len(file_content)
+        file_hash = hashlib.sha256(file_content).hexdigest()
+    else:
+        file_size = 0
+        file_hash = hashlib.sha256(b'').hexdigest()
 
     if not content_type:
         content_type = get_mime_type(filename)
-
-    file_hash = hashlib.sha256(file_content or b'').hexdigest()
     encrypted_id = sign_file_id(file_id, file_path)
     mime_type = get_mime_type(filename)
     upload_time = int(time.time())

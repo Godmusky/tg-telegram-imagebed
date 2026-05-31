@@ -1,5 +1,5 @@
 # Telegram Bot
-# 注意: 使用 Python 3.10+ 语法，确保 Python >= 3.10
+# Python 版本要求: >= 3.10（Docker 基础镜像使用 python:3.11-alpine）
 python-telegram-bot==21.0.1
 Kurigram==2.2.19
 TgCrypto==1.2.5
@@ -9,8 +9,8 @@ Flask==3.0.0
 flask-cors==4.0.0
 
 # HTTP Client
-aiohttp>=3.9.4
-requests>=2.32.2
+aiohttp==3.11.18
+requests==2.32.4
 
 # 其他依赖
 python-dotenv==1.0.0

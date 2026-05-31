@@ -29,12 +29,7 @@ def admin_security_log():
         return _admin_options('GET, OPTIONS')
 
     try:
-        with get_connection() as conn:
-            cursor = conn.cursor()
-            cursor.execute("SELECT value FROM admin_config WHERE key = 'security_log'")
-            row = cursor.fetchone()
-
-        logs = json.loads(row[0]) if row else []
+        logs = admin_module._read_security_log()
         logs.reverse()
         return jsonify({'success': True, 'data': logs})
     except Exception as e:
