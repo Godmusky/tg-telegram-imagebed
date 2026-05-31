@@ -62,6 +62,13 @@ def get_image(encrypted_id):
         if not file_info:
             return jsonify({'success': False, 'error': 'File not found'}), 404
 
+        # 浏览器直接访问 /image/{id} 时自动跳转到自适应查看页
+        # 判断依据: Accept header 含 text/html 说明是浏览器直接打开而非 <img> 标签加载
+        accept = (request.headers.get('Accept') or '*/*').lower()
+        if 'text/html' in accept:
+            # <img> 标签或 CDN 回源的 Accept 是 image/* 或 */*，不含 text/html
+            return redirect(f"/view/{encrypted_id}", code=302)
+
         # 域名限制检查
         try:
             from ..database import is_allowed_image_domain
