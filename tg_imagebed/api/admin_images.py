@@ -489,7 +489,7 @@ def admin_delete_images():
                                 backend.delete(storage_key=storage_key)
                                 storage_deleted_count += 1
                             except Exception as e:
-                                logger.debug(f"删除存储文件失败: {encrypted_id}, {e}")
+                                logger.warning(f"删除存储文件失败: {encrypted_id}, {e}")
                 except Exception as e:
                     logger.debug(f"存储后端删除跳过: {e}")
 
@@ -554,7 +554,7 @@ def admin_delete_images():
                             except Exception:
                                 pass
                 except Exception as e:
-                    logger.debug(f"TG消息删除跳过: {e}")
+                    logger.warning(f"TG消息删除跳过: {e}")
 
             for chunk in _chunked(ids):
                 placeholders = ','.join('?' * len(chunk))

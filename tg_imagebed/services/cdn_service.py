@@ -81,7 +81,7 @@ def _get_effective_cdn_settings():
         cache_warming_enabled = str(get_system_setting("enable_cache_warming") or "0") == "1"
     except sqlite3.Error as e:
         # 数据库不可用时使用默认值（全部关闭）
-        logger.debug(f"从数据库读取 CDN 设置失败: {e}")
+        logger.warning(f"从数据库读取 CDN 设置失败: {e}")
 
     with _cdn_settings_lock:
         _CDN_SETTINGS_CACHE.update({

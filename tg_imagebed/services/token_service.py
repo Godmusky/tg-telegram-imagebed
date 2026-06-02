@@ -216,7 +216,7 @@ class TokenService:
                     if resp.ok and resp.json().get("ok"):
                         result["tg_deleted"] += 1
                 except Exception as e:
-                    logger.debug(f"Post-commit TG delete failed: {entry}, {e}")
+                    logger.warning(f"Post-commit TG delete failed: {entry}, {e}")
 
         return result
 

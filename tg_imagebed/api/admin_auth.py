@@ -55,9 +55,17 @@ def admin_login_api():
     """管理员登录"""
     from ..config import SESSION_LIFETIME
 
+    data = request.get_json()
+    username = data.get('username', '').strip()
+    password = data.get('password', '')
+    remember_me = bool(data.get('remember_me', False))
+
+    if not username or not password:
+        return jsonify({'success': False, 'message': '用户名和密码不能为空'}), 400
+
     ip = admin_module._get_client_ip(request)
 
-    allowed, retry_after, remaining = admin_module._check_login_allowed(ip)
+    allowed, retry_after, remaining = admin_module._check_login_allowed(ip, username)
     if not allowed:
         logger.warning(f"登录被锁定: IP={ip}, 剩余等待={retry_after}秒")
         admin_module._log_security_event(
@@ -81,6 +89,7 @@ def admin_login_api():
 
     if admin_module.verify_admin_password(username, password):
         admin_module._record_login_success(ip)
+        admin_module._clear_username_failures(username)
 
         session['admin_logged_in'] = True
         session['admin_username'] = username
@@ -119,6 +128,7 @@ def admin_login_api():
         })
 
     admin_module._record_login_failure(ip)
+    admin_module._record_username_failure(username, ip)
     admin_module._log_security_event('login_failed', ip, username)
     _, _, remaining = admin_module._check_login_allowed(ip)
     logger.warning(f"管理员登录失败: {username}, IP={ip}, 剩余尝试={remaining}")

@@ -311,13 +311,19 @@ def _read_expected_sha256(path: Path) -> str:
 
 def _safe_extract_zip(zip_path: Path, target_dir: Path) -> None:
     target_dir.mkdir(parents=True, exist_ok=True)
+    real_target = os.path.realpath(target_dir)
     with zipfile.ZipFile(zip_path, 'r') as zf:
         for member in zf.infolist():
             entry = member.filename
-            entry_path = Path(entry)
-            if entry_path.is_absolute() or '..' in entry_path.parts:
+            member_path = os.path.realpath(target_dir / entry)
+            if not member_path.startswith(real_target + os.sep) and member_path != real_target:
                 raise RuntimeError(f'压缩包包含非法路径: {entry}')
-        zf.extractall(target_dir)
+            if member.is_dir():
+                os.makedirs(member_path, exist_ok=True)
+            else:
+                os.makedirs(os.path.dirname(member_path), exist_ok=True)
+                with zf.open(member) as source, open(member_path, 'wb') as dest:
+                    shutil.copyfileobj(source, dest)
 
 
 def _resolve_release_root(staging_dir: Path) -> Path:

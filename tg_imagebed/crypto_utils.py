@@ -75,14 +75,9 @@ def encrypt_value(plaintext: str) -> str:
     if not plaintext:
         return ""
 
-    try:
-        raw = _raw_encrypt(plaintext.encode("utf-8"))
-        b64 = base64.urlsafe_b64encode(raw).decode("ascii")
-        return (ENC_PREFIX + b64.encode("ascii")).decode("ascii")
-    except Exception as e:
-        logger.error(f"加密失败: {e}")
-        # 加密失败时返回明文 (fail-open，避免锁死数据)
-        return plaintext
+    raw = _raw_encrypt(plaintext.encode("utf-8"))
+    b64 = base64.urlsafe_b64encode(raw).decode("ascii")
+    return (ENC_PREFIX + b64.encode("ascii")).decode("ascii")
 
 
 def decrypt_value(value: str) -> str:

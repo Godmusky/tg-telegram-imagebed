@@ -275,7 +275,7 @@ def _load_storage_config() -> Dict[str, Any]:
         if db_json:
             return json.loads(db_json)
     except Exception as e:
-        logger.debug(f"从数据库读取存储配置失败: {e}")
+        logger.warning(f"从数据库读取存储配置失败，使用默认配置: {e}")
 
     # 返回默认配置
     return {

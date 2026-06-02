@@ -178,7 +178,7 @@ def _login_attempts_upsert_db(ip: str, data: dict) -> None:
                 )
             )
     except sqlite3.Error as e:
-        logger.debug(f"写入 login_attempts 失败: {e}")
+        logger.warning(f"写入 login_attempts 失败: {e}")
 
 
 def _login_attempts_del_db(ip: str) -> None:
@@ -299,9 +299,9 @@ def _start_periodic_cleanup() -> None:
     logger.info("登录追踪定时清理线程已启动（间隔 5 分钟）")
 
 
-def _check_login_allowed(ip: str) -> tuple[bool, int, int]:
+def _check_login_allowed(ip: str, username: str = '') -> tuple[bool, int, int]:
     """
-    检查 IP 是否允许登录
+    检查 IP 是否允许登录（支持用户名+IP 双重维度）
     返回: (allowed, retry_after_seconds, remaining_attempts)
     """
     _cleanup_expired_trackers()
@@ -322,8 +322,67 @@ def _check_login_allowed(ip: str) -> tuple[bool, int, int]:
         _set_login_info(ip, None)
         return True, 0, LOGIN_MAX_ATTEMPTS
 
-    remaining = max(0, LOGIN_MAX_ATTEMPTS - info.get('attempts', 0))
+    # 用户名维度检查：统计该用户名在窗口期内跨 IP 的失败总数
+    if username:
+        uname_attempts = _get_username_total_failures(username)
+        remaining_by_ip = max(0, LOGIN_MAX_ATTEMPTS - info.get('attempts', 0))
+        remaining_by_user = max(0, LOGIN_MAX_ATTEMPTS - uname_attempts)
+        remaining = min(remaining_by_ip, remaining_by_user)
+    else:
+        remaining = max(0, LOGIN_MAX_ATTEMPTS - info.get('attempts', 0))
+
     return True, 0, remaining
+
+
+_USERNAME_FAIL_KEY_PREFIX = "uname:"
+
+
+def _get_username_total_failures(username: str) -> int:
+    """统计指定用户名在窗口期内的总失败次数（跨所有 IP）"""
+    now = time.time()
+    cutoff = now - LOGIN_ATTEMPT_WINDOW
+    try:
+        with get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                "SELECT SUM(failed_count) FROM login_attempts "
+                "WHERE ip LIKE ? AND last_attempt > ?",
+                (f"{_USERNAME_FAIL_KEY_PREFIX}{username}\t%", cutoff)
+            )
+            row = cursor.fetchone()
+            return int(row[0]) if row and row[0] else 0
+    except sqlite3.Error:
+        return 0
+
+
+def _record_username_failure(username: str, ip: str) -> None:
+    """记录用户名维度失败（跨 IP 追踪同一用户名的失败尝试）"""
+    now = time.time()
+    key = f"{_USERNAME_FAIL_KEY_PREFIX}{username}\t{ip}"
+    info = _get_login_info(key)
+    if not info:
+        info = {'attempts': 1, 'locked_until': 0, 'lockout_level': 0, 'last_attempt': now}
+    else:
+        info['attempts'] = info.get('attempts', 0) + 1
+        info['last_attempt'] = now
+    _set_login_info(key, info)
+
+
+def _clear_username_failures(username: str) -> None:
+    """登录成功后清除该用户名下所有 IP 的失败记录"""
+    try:
+        with get_connection() as conn:
+            conn.execute(
+                "DELETE FROM login_attempts WHERE ip LIKE ?",
+                (f"{_USERNAME_FAIL_KEY_PREFIX}{username}\t%",)
+            )
+    except sqlite3.Error as e:
+        logger.warning(f"清除用户名失败记录失败: {e}")
+    with _login_cache_lock:
+        prefix = f"{_USERNAME_FAIL_KEY_PREFIX}{username}\t"
+        keys_to_del = [k for k in _login_cache if k.startswith(prefix)]
+        for k in keys_to_del:
+            del _login_cache[k]
 
 
 def _record_login_failure(ip: str) -> None:
@@ -591,7 +650,7 @@ def _save_active_sessions(sessions: list[dict]) -> None:
                 ('active_sessions', json.dumps(sessions, ensure_ascii=False))
             )
     except sqlite3.Error as e:
-        logger.debug(f"保存活跃 session 失败: {e}")
+        logger.warning(f"保存活跃 session 失败: {e}")
 
 
 def _register_session(
@@ -744,7 +803,7 @@ def _get_config_status_from_db() -> dict:
         cdn_domain = str(get_system_setting('cloudflare_cdn_domain') or '').strip()
         group_upload_admin_only = str(get_system_setting('group_upload_admin_only') or '0') == '1'
     except sqlite3.Error as e:
-        logger.debug(f"从数据库读取系统设置失败: {e}")
+        logger.warning(f"从数据库读取系统设置失败: {e}")
         group_upload_admin_only = False
 
     # CDN 监控只有在 CDN 启用时才有意义
@@ -787,7 +846,7 @@ def get_admin_config() -> dict:
 
         return {
             'username': username,
-            'password_status': '已设置' if password_hash else '使用默认密码',
+            'password_status': '已设置' if password_hash else '未设置（需通过 /setup 初始化）',
             'session_lifetime': SESSION_LIFETIME
         }
 
